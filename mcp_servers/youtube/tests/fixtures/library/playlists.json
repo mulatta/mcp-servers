@@ -1,0 +1,56 @@
+{
+  "contents": {
+    "twoColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "selected": true,
+            "content": {
+              "richGridRenderer": {
+                "contents": [
+                  {
+                    "richItemRenderer": {
+                      "content": {
+                        "lockupViewModel": {
+                          "metadata": {
+                            "lockupMetadataViewModel": {
+                              "title": {
+                                "content": "Fixture"
+                              },
+                              "metadata": {}
+                            }
+                          },
+                          "contentId": "PLfixture0000000016",
+                          "contentType": "LOCKUP_CONTENT_TYPE_PLAYLIST"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "richItemRenderer": {
+                      "content": {
+                        "lockupViewModel": {
+                          "metadata": {
+                            "lockupMetadataViewModel": {
+                              "title": {
+                                "content": "Fixture"
+                              },
+                              "metadata": {}
+                            }
+                          },
+                          "contentId": "PLfixture0000000017",
+                          "contentType": "LOCKUP_CONTENT_TYPE_PLAYLIST"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "header": {}
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
