@@ -178,15 +178,16 @@ underlying privileges. No raw CDP/API or mutating tools are exposed.
 
 ## Opt-in live read check
 
-Do not run this without the account owner's explicit approval. It reads one
-item per tool, prints only counts/account-match status, and never modifies
-account data. Set the expected channel ID and an existing playlist ID after
-checking them manually in Neko. IDs are not cookie or authentication values.
+Do not run this without the account owner's explicit approval. After logging
+into YouTube in Neko, run the check through the actual stdio MCP client. It
+requests five items per tool, chooses a playlist ID from the first response
+(or WL if none is listed), and checks account consistency across responses.
+No manual channel or playlist ID is required. Short lists may return fewer
+than five items. It prints only counts, safe error codes, timings, and stderr
+byte count, never titles, IDs, cookies, or raw server diagnostics.
 
 ```sh
 YOUTUBE_LIVE_READONLY=1 \
-YOUTUBE_LIVE_ACCOUNT_ID=UC_REPLACE_WITH_CHANNEL_ID \
-YOUTUBE_LIVE_PLAYLIST_ID=PL_REPLACE_WITH_PLAYLIST_ID \
 YOUTUBE_CDP_URL=http://127.0.0.1:9222 \
 bun run test:live
 ```
@@ -195,6 +196,19 @@ Without opt-in the command exits before loading the reader or contacting CDP.
 It is not a `*.test.ts` file and is excluded from the default test command.
 The default suite uses local protocol fixtures, not Neko or YouTube.
 See [VERIFICATION.md](VERIFICATION.md) for recorded verification limits.
+
+## Logging and audit
+
+There is no debug-mode flag or persistent audit logger. YouTube.js logging is
+disabled to avoid leaking authentication or raw responses. Stdout is reserved
+for MCP messages, including requested tool results. Stderr normally stays
+empty; unexpected process failures emit only a fixed safe message. Ordinary
+tool failures return safe codes to the caller, not detailed server logs.
+
+The opt-in check's summary is test evidence, not a production audit trail.
+Request IDs, per-call audit records, durable storage, retention, and operator
+log configuration are not implemented. Do not enable upstream verbose logging
+as a substitute: it can expose session material.
 
 ## Verification boundary
 
