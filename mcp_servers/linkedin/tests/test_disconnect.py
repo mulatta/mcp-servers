@@ -1,4 +1,5 @@
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
@@ -135,6 +136,48 @@ async def test_disconnect_reconnect(chromium: tuple[str, str], mode: str) -> Non
             # Only this exact test-created handle is eligible for orphan cleanup.
             if orphan is not None and not orphan.is_closed():
                 await orphan.close()
+
+
+@pytest.mark.asyncio
+async def test_discovery_success_then_websocket_failure() -> None:
+    requests: list[str] = []
+
+    async def serve(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            request = await reader.readuntil(b"\r\n\r\n")
+            path = request.split(b" ")[1].decode()
+            requests.append(path)
+            port = writer.get_extra_info("sockname")[1]
+            if path == "/json/version/":
+                body = json.dumps(
+                    {"webSocketDebuggerUrl": f"ws://127.0.0.1:{port}/unavailable"}
+                ).encode()
+                writer.write(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                    + f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n".encode()
+                    + body
+                )
+            else:
+                writer.write(
+                    b"HTTP/1.1 503 Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                )
+            await writer.drain()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    async with await asyncio.start_server(serve, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        session = BrowserSession(f"http://127.0.0.1:{port}")
+        try:
+            with pytest.raises(BrowserConnectionError, match="discovery.*relay"):
+                async with session.acquire():
+                    pytest.fail("Unavailable WebSocket must not connect")
+            assert requests == ["/json/version/", "/unavailable"]
+            assert session.page is None
+            assert session._driver is None
+        finally:
+            await session.close()
 
 
 @pytest.mark.asyncio
