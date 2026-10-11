@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { Innertube, Log, YTNodes } from "youtubei.js";
 import { SafeError } from "../errors.ts";
 import { normalize, type Page } from "./normalize.ts";
+import { checkResponse } from "./response.ts";
 import type { ToolName, ReadInput } from "../server.ts";
 
 Log.setLevel(Log.Level.NONE);
@@ -50,11 +51,7 @@ export class YoutubeClient {
             } catch {
               throw new SafeError("UPSTREAM_UNAVAILABLE");
             }
-            if (response.status === 401) throw new SafeError("AUTH_REQUIRED");
-            if (response.status === 429) throw new SafeError("RATE_LIMITED");
-            if (response.status === 403)
-              throw new SafeError("PLAYLIST_UNAVAILABLE");
-            if (!response.ok) throw new SafeError("UPSTREAM_UNAVAILABLE");
+            await checkResponse(response);
             return response;
           },
           {
