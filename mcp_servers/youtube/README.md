@@ -202,10 +202,10 @@ See [VERIFICATION.md](VERIFICATION.md) for recorded verification limits.
 
 ### Structured diagnostic contract
 
-The observability module accepts `YOUTUBE_LOG_LEVEL=error|warn|info|debug`,
-with `info` as the default. Empty or unknown values are rejected without
-printing their contents. There is no separate `YOUTUBE_DEBUG` flag.
-Process wiring is described below; this contract does not enable upstream logs.
+The server accepts `YOUTUBE_LOG_LEVEL=error|warn|info|debug`, with `info` as
+the default. Empty or unknown values stop startup without printing their
+contents or contacting CDP. There is no separate `YOUTUBE_DEBUG` flag.
+This contract does not enable upstream logs.
 
 Records use JSONL with `schema_version: 1`, UTC `timestamp`, `level`, and a
 fixed `event`. Permitted data is limited to internally generated correlation
@@ -226,16 +226,16 @@ forced termination, broken stderr, and saturation can lose records, including
 completion and shutdown events. File capture, rotation, and retention belong
 to the operator, not this server.
 
-There is no debug-mode flag or persistent audit logger. YouTube.js logging is
-disabled to avoid leaking authentication or raw responses. Stdout is reserved
-for MCP messages, including requested tool results. Stderr normally stays
-empty; unexpected process failures emit only a fixed safe message. Ordinary
-tool failures return safe codes to the caller, not detailed server logs.
+Startup emits `server.start` at info; unexpected process failures emit
+`server.fatal` at error with a fixed safe code rather than an exception or
+stack. Stderr is no longer normally empty. Stdout remains reserved for MCP
+messages, including requested results. YouTube.js logging stays disabled.
+Request and stage tracing are being connected separately; ordinary tool
+failures still return their existing safe codes to the caller.
 
 The opt-in check's summary is test evidence, not a production audit trail.
-Request IDs, per-call audit records, durable storage, retention, and operator
-log configuration are not implemented. Do not enable upstream verbose logging
-as a substitute: it can expose session material.
+Durable storage and retention are not provided. Do not enable upstream verbose
+logging as a substitute: it can expose session material.
 
 ## Verification boundary
 
