@@ -4,8 +4,9 @@ Read-only YouTube MCP server using Bun and TypeScript.
 
 Five read-only tools are connected to the CDP session provider, YouTube.js
 adapter, normalization, and bounded pagination. Stdio discovery is credential
-free; actual reads authenticate lazily. Local integration tests pass. Personal
-account compatibility has not been live-verified.
+free; actual reads authenticate lazily. Local integration tests pass. An
+approved live check returned five items from each tool on one account;
+see [VERIFICATION.md](VERIFICATION.md) for scope and remaining limits.
 
 ## Development
 

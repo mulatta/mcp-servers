@@ -17,7 +17,8 @@ was accessed for this inspection.
   from `CopyLink.short_url`; fail closed if absent or ambiguous. This settings
   read is documented in upstream issue #783. Do not use display names, cookie
   hashes, mutable handles, or account-switch tokens as identity. Accounts
-  without an identifiable channel fail safely; live compatibility is unverified.
+  without an identifiable channel fail safely. The approved live smoke check
+  verified this identity read on one account, not universal compatibility.
 - Generate session context locally and disable Innertube config/player
   retrieval. This avoids unrelated bootstrap requests and lets transport
   restrict authenticated traffic to the fixed YouTube browse endpoint.
@@ -40,7 +41,24 @@ Latest upstream inspected: `bad89d2657e88f907011655f199fba9fb615c339`
 Issue <https://github.com/LuanRT/YouTube.js/issues/783> is a closed historical
 accounts-list 400 report, not proof of a current regression or released fix.
 The settings fixture used here is source-derived and synthetic, not captured
-personal account data. Real-response library fixtures remain a separate task.
+personal account data. Library fixture provenance is documented under
+`tests/fixtures/library/README.md`.
+
+The approved live check exposed local normalization gaps already handled by
+installed 18.1.0 and the inspected upstream commit:
+
+- `ContinuationItemView` wraps a `continuationCommand` navigation endpoint.
+  Upstream PR #1193 is merged; installed source includes that class.
+- `NavigationEndpoint` unwraps `innertubeCommand` and supports command-executor
+  bundles (merged PR #968). Our adapter extracts only the single browse token;
+  it never executes other commands embedded in a response.
+- `ReelShelf.items` and `ShortsLockupView.onTap` / `overlayMetadata` describe
+  history Shorts. Normalize them in place to retain order and date grouping.
+
+Shape-only live observations became synthetic regression cases in
+`tests/protocol/modern-layouts.test.ts`. No live response bodies, identifiers,
+or credential-bearing payloads were copied into fixtures. No dependency
+upgrade or upstream patch was required.
 
 ## Chromium CDP
 
