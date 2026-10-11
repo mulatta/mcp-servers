@@ -25,5 +25,20 @@ bodies belong in this record. Live approval is not implied by a passing suite.
 
 ## Local checks
 
-The final development-shell verification is recorded after frozen install,
-type checking, formatting, the default suite, and diff validation.
+Verified in `nix develop .#youtube`:
+
+- `bun install --frozen-lockfile`: passed without dependency changes.
+- `bun run format` and `bun run check`: passed (TypeScript and Prettier).
+- `bun run test`: **55 passed, 0 failed**, across 14 protocol test files.
+- `git diff --check`: passed.
+- `openspec validate youtube-readonly-mcp --strict`: passed.
+
+Coverage includes real subprocess stdio discovery and five-tool integration,
+local HTTP/WebSocket CDP exchanges, stable identity parsing, snapshot refresh,
+account-change locking, error classification, secret-safe output/filesystem
+checks, duplicate-preserving traversal, replay, TTL/LRU/memory bounds,
+cancellation, deadlines, documented examples, and disabled-live access guards.
+
+A final regression test confirmed that an evicted cursor cannot hide a
+permanent account-change lock. That failure was reproduced before correction.
+All these results are local-fixture evidence; live status above is unchanged.
