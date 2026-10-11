@@ -64,6 +64,7 @@ export class Paginator {
     signal: AbortSignal,
   ): Promise<Result> {
     signal.throwIfAborted();
+    this.sessions.assertAccountUnchanged();
     this.trim();
     const key = JSON.stringify([name, input.playlist_id ?? null, input.limit]);
     let state: State | undefined;

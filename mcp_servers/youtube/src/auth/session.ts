@@ -26,6 +26,10 @@ export class SessionProvider<T> {
     private now = Date.now,
   ) {}
 
+  assertAccountUnchanged() {
+    if (this.changed) throw new SafeError("ACCOUNT_CHANGED");
+  }
+
   isCurrent(snapshot: Snapshot<T>) {
     return (
       !this.changed &&
@@ -48,7 +52,7 @@ export class SessionProvider<T> {
 
   async get(signal: AbortSignal): Promise<Snapshot<T>> {
     signal.throwIfAborted();
-    if (this.changed) throw new SafeError("ACCOUNT_CHANGED");
+    this.assertAccountUnchanged();
     if (this.snapshot && this.isCurrent(this.snapshot)) return this.snapshot;
     this.invalidate();
     if (!this.flight) {
