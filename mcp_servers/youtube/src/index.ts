@@ -6,7 +6,7 @@ import { Logger } from "./observability/logger.ts";
 
 export async function start(
   reader?: Reader,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; logger?: Logger } = {},
 ) {
   let logger: Logger | undefined;
   let failing = false;
@@ -30,14 +30,35 @@ export async function start(
       await logger.close();
       process.exit(1);
     }
-    logger = new Logger(level);
+    const diagnostics = options.logger ?? new Logger(level);
+    logger = diagnostics;
     const server = createServer(reader ?? createReader(), options);
+    let closing = false;
+    const stop = async (reason: "SIGINT" | "SIGTERM" | "transport_closed") => {
+      if (closing || failing) return;
+      closing = true;
+      try {
+        await server.close();
+        diagnostics.emit({ event: "server.stop", reason });
+        await diagnostics.close();
+        process.exit(0);
+      } catch {
+        fatal();
+      }
+    };
     for (const event of ["SIGINT", "SIGTERM"] as const)
-      process.once(event, () => {
-        void server.close().then(() => process.exit(0), fatal);
+      process.on(event, () => {
+        void stop(event);
       });
+    server.server.onclose = () => {
+      void stop("transport_closed");
+    };
+    // The SDK transport does not translate stdin EOF into onclose.
+    process.stdin.once("end", () => {
+      void stop("transport_closed");
+    });
     await server.connect(new StdioServerTransport());
-    logger.emit({ event: "server.start" });
+    diagnostics.emit({ event: "server.start" });
   } catch {
     fatal();
   }
