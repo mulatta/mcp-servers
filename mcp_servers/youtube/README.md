@@ -71,6 +71,28 @@ JSON with safe `code` and `message` fields. Raw upstream exceptions are never
 returned. Client cancellation aborts the operation; requests exceeding 30
 seconds return `TIMEOUT` and abort their backend signal.
 
+## Results
+
+[Validated examples](examples/results.json) cover all five tools. Successful
+responses contain identical JSON in `structuredContent` and text content:
+
+- `account_id`: verified, pinned channel ID, not a display name or email.
+- `items`: ordered summaries, including repeats and explicit placeholders.
+- `next_cursor`: opaque in-process cursor or `null`.
+- `has_more`: whether `next_cursor` is non-null.
+
+`youtube_list_playlists` returns `playlist_id`, `title`, and `video_count`.
+All other tools return `video_id`, `title`, `url`, `channel_name`, and
+`availability` (`available`, `private`, `deleted`, `unavailable`, or `null`).
+`youtube_get_watch_history` additionally returns `watched_at` and `group_label`.
+Current supported history structures do not provide exact watch timestamps:
+`watched_at` is `null`. Relative labels such as `Today` stay in `group_label`.
+
+Unknown values are `null`, never guessed from display text. Explicit private
+or deleted entries remain in the list. YouTube may hide unavailable items
+entirely; this server cannot recover them or promise a complete archive.
+An unsupported response is an error, not an empty success.
+
 ## Tests
 
 ```sh
@@ -126,7 +148,7 @@ underlying privileges. No raw CDP/API or mutating tools are exposed.
 
 ## Remaining work
 
-Library response normalization, bounded pagination, and full stdio-to-upstream
-integration remain pending. HTTP deployment, Nix application packaging, and
+Bounded pagination and full stdio-to-upstream integration remain pending.
+Library response normalization is implemented behind the internal adapter. HTTP deployment, Nix application packaging, and
 all writes are separate changes. Live read-only testing requires explicit
 approval and is not part of the default suite.
