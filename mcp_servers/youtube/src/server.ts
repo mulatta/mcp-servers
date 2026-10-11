@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { errorResult, SafeError } from "./errors.ts";
+import { withDeadline } from "./deadline.ts";
 
 export const toolNames = [
   "youtube_list_playlists",
@@ -33,6 +34,7 @@ export function createServer(
   reader: Reader = async () => {
     throw new SafeError("UPSTREAM_UNAVAILABLE");
   },
+  options: { timeoutMs?: number } = {},
 ) {
   const server = new McpServer({ name: "youtube-mcp", version: "0.0.0" });
   const paging = {
@@ -60,7 +62,11 @@ export function createServer(
       },
       async (input, extra) => {
         try {
-          const result = await reader(name, input, extra.signal);
+          const result = await withDeadline(
+            extra.signal,
+            options.timeoutMs ?? 30_000,
+            (signal) => reader(name, input, signal),
+          );
           return {
             structuredContent: result,
             content: [{ type: "text", text: JSON.stringify(result) }],
