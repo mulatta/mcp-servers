@@ -1,6 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Innertube, Log, YTNodes } from "youtubei.js";
 import { SafeError } from "../errors.ts";
+import { normalize, type Page } from "./normalize.ts";
+import type { ToolName, ReadInput } from "../server.ts";
 
 Log.setLevel(Log.Level.NONE);
 
@@ -80,6 +82,40 @@ export class YoutubeClient {
       return [...ids][0]!;
     });
     return { accountId, value };
+  }
+
+  async page(
+    name: ToolName,
+    input: ReadInput,
+    signal: AbortSignal,
+    continuation?: string,
+  ): Promise<Page> {
+    const browseId =
+      name === "youtube_list_playlists"
+        ? "FEplaylist_aggregation"
+        : name === "youtube_get_watch_history"
+          ? "FEhistory"
+          : name === "youtube_get_watch_later"
+            ? "VLWL"
+            : name === "youtube_get_liked_videos"
+              ? "VLLL"
+              : `VL${input.playlist_id}`;
+    return this.use(signal, async (client) => {
+      const response = await client.actions.execute(
+        "/browse",
+        continuation
+          ? { continuation, parse: false }
+          : { browseId, parse: false },
+      );
+      return normalize(
+        response.data,
+        name === "youtube_list_playlists"
+          ? "playlists"
+          : name === "youtube_get_watch_history"
+            ? "history"
+            : "videos",
+      );
+    });
   }
 
   async use<T>(

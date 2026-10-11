@@ -1,0 +1,72 @@
+{
+  "contents": {
+    "twoColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "selected": true,
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "itemSectionRenderer": {
+                      "contents": [
+                        {
+                          "playlistVideoListRenderer": {
+                            "contents": [
+                              {
+                                "playlistVideoRenderer": {
+                                  "videoId": "v0000000005",
+                                  "title": {
+                                    "runs": [
+                                      {
+                                        "text": "Fixture"
+                                      }
+                                    ]
+                                  },
+                                  "shortBylineText": {
+                                    "runs": [
+                                      {
+                                        "text": "Fixture"
+                                      }
+                                    ]
+                                  },
+                                  "isPlayable": true
+                                }
+                              },
+                              {
+                                "playlistVideoRenderer": {
+                                  "videoId": "v0000000006",
+                                  "title": {
+                                    "runs": [
+                                      {
+                                        "text": "Fixture"
+                                      }
+                                    ]
+                                  },
+                                  "shortBylineText": {
+                                    "runs": [
+                                      {
+                                        "text": "Fixture"
+                                      }
+                                    ]
+                                  },
+                                  "isPlayable": true
+                                }
+                              }
+                            ],
+                            "playlistId": "PLfixture0000000015"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
