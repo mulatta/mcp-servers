@@ -93,6 +93,37 @@ or deleted entries remain in the list. YouTube may hide unavailable items
 entirely; this server cannot recover them or promise a complete archive.
 An unsupported response is an error, not an empty success.
 
+## Pagination
+
+Use [examples/walk.ts](examples/walk.ts) with an initialized MCP SDK client:
+
+```ts
+for await (const page of walk(client, "youtube_get_watch_later", {
+  limit: 20,
+})) {
+  consume(page.items);
+}
+```
+
+This is explicit client-side iteration, not automatic server-side traversal.
+Keep tool, playlist ID, and limit unchanged when passing `next_cursor`.
+Replaying a still-valid cursor returns the same page. Empty `items` with a
+non-null cursor is valid: follow that cursor instead of assuming completion.
+The server makes at most three additional upstream requests per page.
+
+Cursors last at most five minutes and exist only in this process. State is
+limited to 128 cursors and 16 MiB of serialized retained data, evicted by LRU.
+Session refresh, restart, and eviction produce `CURSOR_EXPIRED`. Discard the
+incomplete accumulation and start without a cursor; never silently append a
+restarted traversal to old results. `examples/walk.ts` surfaces expiry rather
+than automatically restarting. The local MCP fixture test runs both traversal
+and explicit recovery.
+
+This is not an immutable snapshot. Browser/account changes can invalidate
+cursors, and concurrent YouTube edits may change ordering between requests.
+The server preserves duplicates and source order; it cannot repair remote
+changes or reconstruct entries YouTube never returned.
+
 ## Tests
 
 ```sh
@@ -148,7 +179,7 @@ underlying privileges. No raw CDP/API or mutating tools are exposed.
 
 ## Remaining work
 
-Bounded pagination and full stdio-to-upstream integration remain pending.
-Library response normalization is implemented behind the internal adapter. HTTP deployment, Nix application packaging, and
+Full stdio-to-upstream integration remains pending. Library response
+normalization and bounded pagination are implemented behind the internal adapter. HTTP deployment, Nix application packaging, and
 all writes are separate changes. Live read-only testing requires explicit
 approval and is not part of the default suite.
