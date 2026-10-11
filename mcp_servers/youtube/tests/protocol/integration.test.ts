@@ -95,5 +95,12 @@ test("stdio to CDP and upstream: five reads, cancellation, deadline, account pin
     await client.close();
     f.close();
   }
-  expect(stderr).toBe("");
+  const records = stderr
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(records.some((record) => record.event === "server.start")).toBe(true);
+  expect(records.every((record) => record.schema_version === 1)).toBe(true);
+  for (const secret of ["fixture-secret", "SAPISID", "/devtools/browser/"])
+    expect(stderr).not.toContain(secret);
 }, 5000);

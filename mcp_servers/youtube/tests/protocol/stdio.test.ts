@@ -45,5 +45,11 @@ test("stdio discovery works without browser credentials and exposes only five re
   } finally {
     await client.close();
   }
-  expect(diagnostics).toBe("");
+  const records = diagnostics
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(records.some((record) => record.event === "server.start")).toBe(true);
+  expect(records.every((record) => record.schema_version === 1)).toBe(true);
+  expect(diagnostics).not.toContain("127.0.0.1");
 });
