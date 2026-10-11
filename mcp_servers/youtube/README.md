@@ -281,6 +281,58 @@ The opt-in check's summary is test evidence, not a production audit trail.
 Durable storage and retention are not provided. Do not enable upstream verbose
 logging as a substitute: it can expose session material.
 
+## External latency verification
+
+Use an existing MCP client and collect stderr separately. There is no new
+benchmark command, background workload, or automatic performance verdict.
+The five-tool `test:live` command is a smoke check, not this procedure.
+
+1. Obtain fresh account-owner approval for tools, limits, conditions, repeats,
+   preparation reads, and the time budget before touching a real account.
+   Previous five-item approval is not permission for repeated measurements.
+   Use local fixtures when approval is absent.
+1. Fix the tool, input limit, environment, and log level. Run sequentially,
+   without unrelated calls, and isolate condition logs. Default to five
+   **attempts per condition** and a **five-minute total budget**, including
+   preparation and process startup. The external client cancels the current
+   request when the remaining budget expires and starts no further requests.
+1. **Cold authentication:** use a new MCP process for every measured attempt;
+   the target call must be its first authenticated read. This does not reset
+   browser, OS, or YouTube caches. If playlist selection needs a preparation
+   read, obtain the ID beforehand and retain it only in client memory.
+1. **Warm authentication:** in one process, perform a preparation read, then
+   repeat the same input **without a cursor** five times while its snapshot
+   remains valid. Confirm `auth_cache=hit`; refresh/mixed cases do not count
+   as warm samples.
+1. **Cursor replay:** obtain a cursor, call it once to prepare its result, then
+   repeat that **same cursor**, tool, playlist, and limit five times. Do not
+   advance to the returned next cursor. Confirm `page_cache=replay`. If no
+   cursor exists, skip with a reason. Expiry or refresh invalidates the
+   condition; do not silently restart and label new work as replay.
+1. Stop the entire procedure immediately on `AUTH_REQUIRED`, `ACCOUNT_CHANGED`,
+   `UPSTREAM_BLOCKED`, or `RATE_LIMITED`, including during preparation.
+   Record other errors/timeouts separately and continue within the remaining
+   budget. If preparation cannot establish a condition, skip that condition
+   with a reason rather than inventing samples.
+1. Exclude preparation from latency statistics but count it in request totals
+   and budget. Report successful sample count, median/min/max, failure count
+   and safe codes, skipped conditions, missing diagnostics, and any stop
+   reason. With zero successful samples, report latency as **N/A**, not zero.
+   Keep server duration, externally measured client round-trip, and process
+   startup times in separate columns. Do not persist IDs, titles, or cursors.
+1. Generated request IDs identify server trace trees, not client request IDs.
+   Sequential call order helps map complete logs, but losses can make matching
+   ambiguous. Mark such measurements unavailable rather than guessing which
+   completion belongs to which attempt. Never count missing logs as successful
+   zero-duration calls or as confirmed query failures.
+
+Debug tracing changes measurement overhead. State the level and collector
+conditions with results. Do not compute p95 from these small samples, impose a
+fixed SLO, or automatically label a delay as an architecture versus implementation
+problem. Review evidence first; the user sets subsequent performance criteria.
+See [VERIFICATION.md](VERIFICATION.md#external-measurement-record-template)
+for the reporting template and an explicitly synthetic arithmetic example.
+
 ## Verification boundary
 
 Local integration covers stdio through HTTP/WebSocket CDP and upstream
