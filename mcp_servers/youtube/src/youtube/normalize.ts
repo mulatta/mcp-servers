@@ -143,7 +143,15 @@ export function normalize(raw: unknown, kind: Kind): Page {
     }
     if (n.messageRenderer) {
       // A recognized explicit message is YouTube's empty-list representation.
-      if (!text(object(n.messageRenderer).text))
+      const message = text(object(n.messageRenderer).text);
+      if (
+        !message ||
+        ![
+          "This playlist has no videos.",
+          "Your history is empty.",
+          "No playlists",
+        ].includes(message)
+      )
         throw new SafeError("UPSTREAM_CHANGED");
       recognized = true;
       return;
