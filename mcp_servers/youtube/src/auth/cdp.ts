@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SafeError } from "../errors.ts";
 import { readConfig } from "../config.ts";
+import { stage } from "../observability/trace.ts";
 
 const target = "https://www.youtube.com/";
 const cookieSchema = z.object({
@@ -151,6 +152,21 @@ class CdpConnection {
   }
 }
 
+async function cdpStage<T>(
+  name: "cdp.connect" | "cdp.cookies",
+  operation: () => Promise<T>,
+): Promise<T> {
+  return stage(name, async () => {
+    try {
+      return await operation();
+    } catch (error) {
+      throw error instanceof SafeError
+        ? error
+        : new SafeError("BROWSER_UNAVAILABLE");
+    }
+  });
+}
+
 export async function acquireCookies(
   endpoint: string,
   signal: AbortSignal,
@@ -158,59 +174,60 @@ export async function acquireCookies(
   let connection: CdpConnection | undefined;
   try {
     signal.throwIfAborted();
-    const url = new URL(readConfig({ YOUTUBE_CDP_URL: endpoint }).cdpUrl);
-    const response = await fetch(new URL("/json/version", url), {
-      redirect: "error",
-      signal,
-    });
-    if (!response.ok) throw new Error();
-    const discovery = z
-      .object({ webSocketDebuggerUrl: z.string() })
-      .parse(await response.json());
-    connection = new CdpConnection(
-      socketUrl(discovery.webSocketDebuggerUrl, url),
-      signal,
-    );
-    await connection.opened;
-    const contexts = z
-      .object({ browserContextIds: z.array(z.string()) })
-      .parse(await connection.call("Target.getBrowserContexts"));
-    const targets = z
-      .object({
-        targetInfos: z.array(
-          z.object({
-            targetId: z.string(),
-            type: z.string(),
-            browserContextId: z.string().optional(),
-          }),
-        ),
-      })
-      .parse(await connection.call("Target.getTargets"));
-    const page = targets.targetInfos.find(
-      (t) =>
-        t.type === "page" &&
-        (!t.browserContextId ||
-          !contexts.browserContextIds.includes(t.browserContextId)),
-    );
-    if (!page) throw new Error();
-    const { sessionId } = z.object({ sessionId: z.string() }).parse(
-      await connection.call("Target.attachToTarget", {
-        targetId: page.targetId,
-        flatten: true,
-      }),
-    );
-    try {
-      return cookieHeader(
-        await connection.call(
-          "Network.getCookies",
-          { urls: [target] },
-          sessionId,
-        ),
+    const cdp = await cdpStage("cdp.connect", async () => {
+      const url = new URL(readConfig({ YOUTUBE_CDP_URL: endpoint }).cdpUrl);
+      const response = await fetch(new URL("/json/version", url), {
+        redirect: "error",
+        signal,
+      });
+      if (!response.ok) throw new Error();
+      const discovery = z
+        .object({ webSocketDebuggerUrl: z.string() })
+        .parse(await response.json());
+      connection = new CdpConnection(
+        socketUrl(discovery.webSocketDebuggerUrl, url),
+        signal,
       );
-    } finally {
-      if (!signal.aborted)
-        await connection.call("Target.detachFromTarget", { sessionId });
-    }
+      await connection.opened;
+      return connection;
+    });
+    return await cdpStage("cdp.cookies", async () => {
+      const contexts = z
+        .object({ browserContextIds: z.array(z.string()) })
+        .parse(await cdp.call("Target.getBrowserContexts"));
+      const targets = z
+        .object({
+          targetInfos: z.array(
+            z.object({
+              targetId: z.string(),
+              type: z.string(),
+              browserContextId: z.string().optional(),
+            }),
+          ),
+        })
+        .parse(await cdp.call("Target.getTargets"));
+      const page = targets.targetInfos.find(
+        (t) =>
+          t.type === "page" &&
+          (!t.browserContextId ||
+            !contexts.browserContextIds.includes(t.browserContextId)),
+      );
+      if (!page) throw new Error();
+      const { sessionId } = z.object({ sessionId: z.string() }).parse(
+        await cdp.call("Target.attachToTarget", {
+          targetId: page.targetId,
+          flatten: true,
+        }),
+      );
+      try {
+        return cookieHeader(
+          await cdp.call("Network.getCookies", { urls: [target] }, sessionId),
+        );
+      } finally {
+        if (!signal.aborted)
+          await cdp.call("Target.detachFromTarget", { sessionId });
+      }
+    });
   } catch (error) {
     if (error instanceof SafeError) throw error;
     throw new SafeError("BROWSER_UNAVAILABLE");

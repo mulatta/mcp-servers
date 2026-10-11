@@ -4,20 +4,27 @@ import {
   type Logger,
   type Stage,
   type StageReference,
+  type LogEvent,
 } from "./logger.ts";
 import { safeError, type ErrorCode } from "../errors.ts";
 import type { ToolName } from "../server.ts";
 
 type Outcome = "ok" | "error" | "timeout" | "cancelled";
+type Caches = Pick<
+  Extract<LogEvent, { event: "stage.end" }>,
+  "auth_cache" | "page_cache"
+>;
 type Span = {
   stage: Stage;
   stage_id: CorrelationId;
   parent_stage_id?: CorrelationId;
   refresh_id?: CorrelationId;
   started: number;
+  caches: Caches;
 };
 type Scope = {
   logger: Logger;
+  caches: Caches;
   request_id?: CorrelationId;
   refresh_id?: CorrelationId;
   active: Map<CorrelationId, Span>;
@@ -31,7 +38,13 @@ type Scope = {
 };
 
 function scopeFor(logger: Logger): Scope {
-  return { logger, active: new Map(), closed: false, refreshes: new Set() };
+  return {
+    logger,
+    caches: {},
+    active: new Map(),
+    closed: false,
+    refreshes: new Set(),
+  };
 }
 const context = new AsyncLocalStorage<{ scope: Scope; parent?: Span }>();
 
@@ -46,6 +59,7 @@ function end(scope: Scope, span: Span, outcome: Outcome, code?: ErrorCode) {
     parent_stage_id: span.parent_stage_id,
     outcome,
     duration_ms: Math.max(0, performance.now() - span.started),
+    ...span.caches,
     code,
   });
 }
@@ -62,6 +76,7 @@ export async function stage<T>(
     stage: name,
     stage_id: new CorrelationId(),
     started: performance.now(),
+    caches: {},
     ...(parent ? { parent_stage_id: parent.stage_id } : {}),
   };
   scope.active.set(span.stage_id, span);
@@ -127,11 +142,18 @@ export class RefreshTrace {
   snapshot() {
     return snapshot(this.scope);
   }
-  async run<T>(operation: () => T | Promise<T>): Promise<T> {
+  async run<T>(
+    operation: () => T | Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    const aborted = () => interrupt(this.scope, "cancelled");
+    signal?.addEventListener("abort", aborted, { once: true });
+    if (signal?.aborted) aborted();
     return context.run({ scope: this.scope }, async () => {
       try {
         return await stage("auth.refresh", operation);
       } finally {
+        signal?.removeEventListener("abort", aborted);
         this.scope.closed = true;
         this.scope.active.clear();
       }
@@ -160,6 +182,18 @@ export function linkRefresh(refresh: RefreshTrace | undefined): () => void {
   };
 }
 
+export function recordCache<K extends keyof Caches>(
+  key: K,
+  value: NonNullable<Caches[K]>,
+) {
+  const store = context.getStore();
+  if (!store || store.scope.closed) return;
+  for (const caches of [store.scope.caches, store.parent?.caches]) {
+    if (!caches) continue;
+    caches[key] = caches[key] && caches[key] !== value ? "mixed" : value;
+  }
+}
+
 export async function withRequest(
   logger: Logger | undefined,
   tool: ToolName,
@@ -177,6 +211,7 @@ export async function withRequest(
       tool,
       limit,
       duration_ms: Math.max(0, performance.now() - started),
+      ...scope.caches,
     });
     try {
       const result = await operation();
