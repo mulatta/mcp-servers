@@ -78,6 +78,25 @@ record limits, whole-record rejection, level-filtered loss reports, write
 throws/callback errors, and the one-second flush timeout. These are local
 results, not additional live reads or performance acceptance evidence.
 
+## Observability measurement conditions: local verification
+
+A real stdio MCP client reproduced all three conditions against local CDP and
+HTTP upstream fixtures. Five fresh processes each performed one cold read;
+one process performed one preparation plus five warm reads; another performed
+two preparation calls plus five replays of the same cursor. Logs matched the
+expected cache states and replayed MCP results were identical.
+
+| Local condition | Measured attempts | Preparation calls | CDP acquisitions | Library HTTP reads |
+| ------------------- | ----------------: | ----------------: | ---------------: | -----------------: |
+| Cold authentication | 5 | 0 | 5 | 5 |
+| Warm authentication | 5 | 1 | 1 | 6 |
+| Same-cursor replay | 5 | 2 | 1 | 1 |
+
+The fixture observed 19 total browse requests: 7 identity reads and 12 library
+reads. This checks measurement **conditions**, not real-account latency or an
+SLO. No new executable benchmark or live access was needed. Account approval
+for the earlier five-item smoke check does not authorize future repeats.
+
 ## External measurement record template
 
 Follow the [external procedure](README.md#external-latency-verification).
@@ -115,7 +134,7 @@ account measurements require fresh approval covering preparation and repeats.
 
 ## Remaining limits
 
-This verifies five items per tool on one authenticated account, not exhaustive
+The historical live section verifies five items per tool on one account, not exhaustive
 library traversal or compatibility with every account/layout. Account identity
 was checked for consistency across tools, not independently compared with a
 manually supplied browser channel ID. Future unknown structures fail closed.
