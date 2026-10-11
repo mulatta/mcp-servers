@@ -60,9 +60,10 @@ async def test_live_profile_and_stdio_shutdown() -> None:
             )
             assert result.data["sections"].get("main_profile", "").strip()
             assert not result.data.get("section_errors")
-        async with asyncio.timeout(10):
-            while not owned.is_closed():
-                await asyncio.sleep(0.05)
+            # Cleanup belongs to the request, not transport shutdown.
+            async with asyncio.timeout(10):
+                while not owned.is_closed():
+                    await asyncio.sleep(0.05)
         assert browser.is_connected()
         assert all(not page.is_closed() for page in originals)
         assert all(

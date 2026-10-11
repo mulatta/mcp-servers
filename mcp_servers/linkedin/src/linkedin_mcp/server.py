@@ -67,7 +67,7 @@ def create_server(session: BrowserSession) -> FastMCP:
             ) from None
         requested, unknown = parse_person_sections(sections)
         try:
-            async with session.acquire() as page:
+            async with session.lease() as page:
                 result = await LinkedInExtractor(page).read_person(
                     username,
                     requested,
