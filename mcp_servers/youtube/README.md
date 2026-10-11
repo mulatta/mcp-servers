@@ -216,6 +216,16 @@ Cookies, authorization headers, CDP URLs, account/video/playlist IDs, titles,
 cursors, raw arguments/responses/exceptions, and hashes of those values are
 never diagnostic fields. Requested MCP results remain on protocol stdout.
 
+The writer retains at most 256 outstanding records or 256 KiB of UTF-8 JSONL,
+including newlines and writes pending inside the stream. New records are
+lost on saturation; after successful output resumes, `logs.dropped` reports
+unreported losses at warn level (filtered when configured at error).
+A broken sink disables diagnostic output without recursive error logging.
+Closing the writer waits at most one second. This is not lossless auditing:
+forced termination, broken stderr, and saturation can lose records, including
+completion and shutdown events. File capture, rotation, and retention belong
+to the operator, not this server.
+
 There is no debug-mode flag or persistent audit logger. YouTube.js logging is
 disabled to avoid leaking authentication or raw responses. Stdout is reserved
 for MCP messages, including requested tool results. Stderr normally stays

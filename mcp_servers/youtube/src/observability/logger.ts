@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { Writable } from "node:stream";
+import { BoundedWriter } from "./writer.ts";
 import type { LogLevel } from "../config.ts";
 import { isErrorCode, type ErrorCode } from "../errors.ts";
 
@@ -92,6 +94,30 @@ const eventSchema = z.union([
 ]);
 export type LogEvent = z.input<typeof eventSchema>;
 const priority = { error: 0, warn: 1, info: 2, debug: 3 };
+
+export class Logger {
+  private writer: BoundedWriter;
+  constructor(
+    private level: LogLevel,
+    sink: Writable = process.stderr,
+  ) {
+    this.writer = new BoundedWriter(sink, (count) =>
+      serialize({ event: "logs.dropped", count }, level),
+    );
+  }
+
+  emit(event: LogEvent) {
+    const line = serialize(event, this.level);
+    if (line !== undefined) this.writer.write(line);
+  }
+
+  get usage() {
+    return this.writer.usage;
+  }
+  close() {
+    return this.writer.close();
+  }
+}
 
 export function serialize(
   event: LogEvent,
