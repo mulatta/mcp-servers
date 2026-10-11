@@ -32,3 +32,15 @@ The reproducer remains evidence of upstream behavior, but the user subsequently 
 The tests verify directory placement, retention decisions, synthetic report contents, and persistence after subprocess exit. They do not exercise screenshot capture or a full browser extraction; those remain separate browser integration checks. Default trace directories survive because the wrapper does not call upstream logging setup/teardown. Source inspection of `logging_config.py` confirms that upstream registers its cleanup in logging setup and invokes `cleanup_trace_dir()` from teardown, neither of which the wrapper uses.
 
 All generated artifacts are inside temporary test directories, including HOME, XDG, upstream source-profile, and explicit trace paths. Existing user diagnostic files were neither inspected nor deleted. The README now documents permitted sensitive diagnostics and the absence of wrapper retention guarantees.
+
+## Neko synthetic background focus probe
+
+With explicit approval and the user watching the Neko screen, a standalone Patchright probe connected through the existing development CDP tunnel. It used the existing default browser context, not a new context or browser. Queue task 505 completed successfully; protocol checks took 35.13 seconds. No LinkedIn lookup, browser restart, screen capture, or existing diagnostic-file inspection occurred.
+
+The probe created one target using `Target.createTarget` with `background: true`, then matched it to a Patchright Page by comparing the returned target ID with `Target.getTargetInfo`. It did not select a page by URL, position, or first page event. The Page navigated to a synthetic data URL, clicked a button, and scrolled using `window.scrollTo`. Button-count and scroll-position assertions passed. After a pause for user interaction, a second click and scroll also passed.
+
+The user independently observed the browser UI: while starting on tab A, they opened tab B, worked there, and returned to A. They saw the synthetic test tab appear in the tab strip, but their selected tab never lost focus to it. This is human UI evidence, not a conclusion from `document.hasFocus()` or another focus-emulated DOM value. The probe used neither foreground activation nor retrospective focus restoration.
+
+Cleanup closed only the exact target ID returned to the probe. Subsequent target enumeration confirmed that it was gone, all pre-existing page targets remained, and the browser connection was still alive. The probe disconnected its driver without closing the shared browser or context.
+
+This is a successful single synthetic compatibility check, not verification of the production wrapper's planned lease lifecycle. It does not cover initialization failure, cancellation, admission, deadline or cleanup-failure recovery, nor real upstream extraction or screenshot capture. The user's additional tab exercised concurrent browser use, but did not establish a deterministic race during target-to-Page matching. Automated race/failure tests and verification against the implemented lease remain outstanding; the related implementation tasks are not marked complete from this probe alone.
