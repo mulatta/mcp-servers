@@ -2,6 +2,10 @@ import { createInterface } from "node:readline";
 import { Logger } from "../../src/observability/logger.ts";
 
 const logger = new Logger("info");
+if (process.argv.includes("--server")) {
+  const { start } = await import("../../src/index.ts");
+  await start(undefined, { logger });
+}
 console.log(JSON.stringify({ ready: true }));
 for await (const command of createInterface({ input: process.stdin })) {
   if (command === "flood") {

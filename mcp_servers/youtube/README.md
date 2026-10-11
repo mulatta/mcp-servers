@@ -226,7 +226,11 @@ forced termination, broken stderr, and saturation can lose records, including
 completion and shutdown events. File capture, rotation, and retention belong
 to the operator, not this server.
 
-Startup emits `server.start` at info; unexpected process failures emit
+Startup emits `server.start` at info. SIGINT, SIGTERM, stdin EOF, and transport
+closure share an idempotent shutdown path: `server.stop` at info, then at most
+one second of diagnostic flushing. Repeated signals do not duplicate the stop
+event. A broken stderr cannot prevent exit; forced termination can lose all
+pending records. Unexpected process failures emit
 `server.fatal` at error with a fixed safe code rather than an exception or
 stack. Stderr is no longer normally empty. Stdout remains reserved for MCP
 messages, including requested results. YouTube.js logging stays disabled.
