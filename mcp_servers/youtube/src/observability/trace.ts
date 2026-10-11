@@ -1,5 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { CorrelationId, type Logger, type Stage } from "./logger.ts";
+import {
+  CorrelationId,
+  type Logger,
+  type Stage,
+  type StageReference,
+} from "./logger.ts";
 import { safeError, type ErrorCode } from "../errors.ts";
 import type { ToolName } from "../server.ts";
 
@@ -18,6 +23,11 @@ type Scope = {
   active: Map<CorrelationId, Span>;
   closed: boolean;
   refreshes: Set<RefreshTrace>;
+  interrupted?: {
+    outcome: "timeout" | "cancelled";
+    active: StageReference[];
+    code: ErrorCode;
+  };
 };
 
 function scopeFor(logger: Logger): Scope {
@@ -75,11 +85,47 @@ export async function stage<T>(
   });
 }
 
+function snapshot(scope: Scope): StageReference[] {
+  return [...scope.active.values()].map((span) => ({
+    stage: span.stage,
+    stage_id: span.stage_id,
+    ...((span.refresh_id ?? scope.refresh_id)
+      ? { refresh_id: span.refresh_id ?? scope.refresh_id }
+      : {}),
+  }));
+}
+
+function interrupt(scope: Scope, outcome: "timeout" | "cancelled") {
+  if (scope.closed || scope.interrupted) return;
+  const active = [
+    ...snapshot(scope),
+    ...[...scope.refreshes].flatMap((refresh) => refresh.snapshot()),
+  ].slice(0, 16);
+  const code = outcome === "timeout" ? "TIMEOUT" : "UPSTREAM_UNAVAILABLE";
+  scope.interrupted = { outcome, active, code };
+  scope.closed = true;
+  for (const span of [...scope.active.values()].reverse())
+    end(scope, span, outcome, code);
+}
+
+export function interruptionHandler(): (
+  outcome: "timeout" | "cancelled",
+) => void {
+  const scope = context.getStore()?.scope;
+  // Abort callbacks can run in the cancelling caller's context, not this request's.
+  return (outcome) => {
+    if (scope) interrupt(scope, outcome);
+  };
+}
+
 export class RefreshTrace {
   readonly id = new CorrelationId();
   private scope: Scope;
   constructor(logger: Logger) {
     this.scope = { ...scopeFor(logger), refresh_id: this.id };
+  }
+  snapshot() {
+    return snapshot(this.scope);
   }
   async run<T>(operation: () => T | Promise<T>): Promise<T> {
     return context.run({ scope: this.scope }, async () => {
@@ -141,11 +187,14 @@ export async function withRequest(
       });
       return result;
     } catch (error) {
-      const code = safeError(error).code;
+      const code = scope.interrupted?.code ?? safeError(error).code;
       logger.emit({
         ...base(),
-        outcome: code === "TIMEOUT" ? "timeout" : "error",
+        outcome:
+          scope.interrupted?.outcome ??
+          (code === "TIMEOUT" ? "timeout" : "error"),
         code,
+        active_stages: scope.interrupted?.active,
       });
       throw error;
     } finally {

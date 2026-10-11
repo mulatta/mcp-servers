@@ -1,4 +1,5 @@
 import { SafeError } from "./errors.ts";
+import { interruptionHandler } from "./observability/trace.ts";
 
 /** Bound the caller's wait as well as cooperative network operations. */
 export async function withDeadline<T>(
@@ -7,15 +8,18 @@ export async function withDeadline<T>(
   operation: (signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
   const controller = new AbortController();
+  const interruptedAt = interruptionHandler();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let onAbort = () => {};
   const interrupted = new Promise<never>((_resolve, reject) => {
     onAbort = () => {
+      interruptedAt("cancelled");
       controller.abort();
       reject(new SafeError("UPSTREAM_UNAVAILABLE"));
     };
     parent.addEventListener("abort", onAbort, { once: true });
     timer = setTimeout(() => {
+      interruptedAt("timeout");
       controller.abort();
       reject(new SafeError("TIMEOUT"));
     }, timeoutMs);

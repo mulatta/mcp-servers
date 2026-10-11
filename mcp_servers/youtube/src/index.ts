@@ -32,7 +32,10 @@ export async function start(
     }
     const diagnostics = options.logger ?? new Logger(level);
     logger = diagnostics;
-    const server = createServer(reader ?? createReader(), options);
+    const server = createServer(reader ?? createReader(), {
+      ...options,
+      logger: diagnostics,
+    });
     let closing = false;
     const stop = async (reason: "SIGINT" | "SIGTERM" | "transport_closed") => {
       if (closing || failing) return;
