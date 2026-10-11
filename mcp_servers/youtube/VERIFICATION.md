@@ -70,8 +70,8 @@ stdout, with at most 256 outstanding records and 256 KiB tracked bytes.
 After consumption resumes, every emitted line parses as JSON and emitted
 start records plus reported losses account for all 30,000 attempts.
 Closing the parent's stderr pipe disables logging while the worker continues
-and exits successfully. These checks verify the writer, not yet complete MCP
-lifecycle or stage tracing; those remain separate integration work.
+and exits successfully. These checks isolate the writer; complete MCP
+lifecycle and stage coverage is recorded in the final local checks below.
 
 Writable tests additionally cover the internal stream queue, UTF-8 byte and
 record limits, whole-record rejection, level-filtered loss reports, write
@@ -96,6 +96,69 @@ The fixture observed 19 total browse requests: 7 identity reads and 12 library
 reads. This checks measurement **conditions**, not real-account latency or an
 SLO. No new executable benchmark or live access was needed. Account approval
 for the earlier five-item smoke check does not authorize future repeats.
+
+## Observability final local checks
+
+Verified in `nix develop .#youtube` without Neko, YouTube, or a personal account:
+
+- `bun install --frozen-lockfile`: 106 installs across 123 packages checked,
+  no dependency changes.
+- `bun run format` and `bun run check`: passed (Prettier and TypeScript).
+- `bun run test`: **107 passed, 0 failed**, across **29** protocol test files;
+  this run made 2,767 assertions.
+- `git diff --check`: passed.
+- `openspec validate youtube-observability --strict`: passed.
+- `openspec validate youtube-readonly-mcp --strict`: passed.
+
+Real subprocess integration at both info and debug covers all five unchanged
+tool results, concurrent acquisition, request/stage correlation, timeouts,
+cancellation, account-change locks, and generated opaque cursors. Debug logs
+exclude returned titles/IDs/cursors as well as credentials. Isolated HOME and
+XDG paths are scanned for unexpected files and a runtime-only cookie sentinel;
+only Bun compilation-cache files are allowed and none contains the sentinel.
+
+Separate actual-pipe integration fills stderr before MCP startup. With stderr
+never consumed, or with its actual pipe closed, discovery and authenticated
+fixture reads still succeed; deadlines abort upstream work, client cancellation
+propagates, subsequent reads recover, and shutdown exits successfully. Lifecycle
+tests cover EOF, repeated signals, safe fatal/configuration failures, and the
+one-second flush budget. The live checker accepts bounded allowlisted JSONL
+instead of requiring zero stderr bytes; its no-opt-in guard still prevents
+network access.
+
+Source review retained the fixed browse-only URL/method and redirect guards,
+in-memory cookie/session/cursor policy, tool schemas, public error codes,
+30-second production deadline, and pinned dependencies. There is no new benchmark
+command, automatic account workload, logger file storage, exporter, or deployment.
+This evidence does not measure real-account performance or guarantee lossless
+logs, hidden YouTube compatibility, or behavior on runtimes other than pinned Bun.
+New real-account checks still require explicit scope approval.
+
+## Stacked review verification
+
+Pre-review verification checked all **37 revisions** individually in an isolated
+worktree, using the pinned development-shell Bun. Each revision passed:
+
+- `nix flake check --no-build --all-systems` (all three declared systems);
+- `nix flake check` (full evaluation and formatting check on aarch64-darwin);
+- `nix fmt -- --fail-on-change`.
+
+The 36 revisions containing the YouTube package also passed
+`bun install --frozen-lockfile` and `bun run check`. The 35 revisions with protocol
+tests passed `bun test tests/protocol`; the first Nix-only revision and the initial
+tooling scaffold have no protocol tests yet.
+
+Python workspace removal is the first revision, so no subsequent revision exports
+environments backed by a nonexistent `uv.lock`. The default and named YouTube
+shells both provide Bun.
+
+Four intentionally failing test-only revisions were folded into their following
+implementations, rather than leaving broken intermediate PRs. Markdown formatting
+was normalized at each revision. Prettier now leaves Markdown to the repository's
+mdformat so the two formatter checks agree. Runtime code, dependency pins, and
+existing `Change-Id` trailers were preserved. The final suite still passes all
+107 tests. Linux outputs were evaluated, not built or runtime-tested. These are
+local macOS checks, not Linux CI or renewed live-account verification.
 
 ## External measurement record template
 
