@@ -238,8 +238,18 @@ pending records. Unexpected process failures emit
 `server.fatal` at error with a fixed safe code rather than an exception or
 stack. Stderr is no longer normally empty. Stdout remains reserved for MCP
 messages, including requested results. YouTube.js logging stays disabled.
-Request and stage tracing are being connected separately; ordinary tool
-failures still return their existing safe codes to the caller.
+Each validated tool execution emits one `request.end` with a generated
+`request_id`, tool name, limit, result, and monotonic `duration_ms`. Success
+is info with returned count; errors, timeouts, and cancellations are warn with
+safe codes. Timeout/cancellation summaries retain the active stage snapshot;
+normal cleanup aborts are not cancellations, and late work cannot publish a
+second completion. Ordinary tool failures keep their existing MCP codes.
+
+Timing starts after SDK input validation and ends when the operation's result
+or safe failure is decided. It excludes MCP serialization/transmission, client
+round-trip, process startup, discovery, and rejected inputs. Measure those
+externally rather than interpreting server duration as end-to-end latency.
+Domain-stage instrumentation is connected separately.
 
 The opt-in check's summary is test evidence, not a production audit trail.
 Durable storage and retention are not provided. Do not enable upstream verbose
