@@ -249,7 +249,33 @@ Timing starts after SDK input validation and ends when the operation's result
 or safe failure is decided. It excludes MCP serialization/transmission, client
 round-trip, process startup, discovery, and rejected inputs. Measure those
 externally rather than interpreting server duration as end-to-end latency.
-Domain-stage instrumentation is connected separately.
+At debug, `stage.start`/`stage.end` identify these boundaries:
+
+| Stage | Meaning |
+| ------------------ | ----------------------------------------------------- |
+| `auth.wait` | Snapshot acquisition or waiting on a shared refresh |
+| `auth.refresh` | One shared authentication acquisition |
+| `cdp.connect` | Discovery HTTP and WebSocket connection |
+| `cdp.cookies` | Default-context selection, cookie read, and detach |
+| `auth.identity` | Client creation and stable account verification |
+| `upstream.request` | Browse execution through body consumption and parsing |
+| `normalize` | Local page normalization |
+| `pagination` | Page assembly, cursor management, and nested waits |
+
+Stage IDs and parent IDs describe nested **inclusive** durations; do not add
+nested or overlapping times to obtain total request time. Shared authentication
+has its own `refresh_id`, linked from each waiting request. Cancelling one
+waiter does not mark another waiter or the shared refresh as cancelled.
+These are local boundaries, not profiling inside YouTube or arbitrary source
+lines. Logging may lose events under backpressure, so a missing end event is
+not proof that work is still running.
+
+`auth_cache` distinguishes `hit`, `miss`, and `shared`; `mixed` means a request
+crossed states, such as reuse followed by reacquisition. `page_cache` is `miss`
+when upstream work is needed, `buffer` when retained items suffice, `replay`
+for a completed cursor result, or `shared` for another request's pending
+calculation. Cache fields are omitted when execution never reaches the relevant
+boundary. Replays and waiters do not fabricate upstream spans or log cursors.
 
 The opt-in check's summary is test evidence, not a production audit trail.
 Durable storage and retention are not provided. Do not enable upstream verbose
