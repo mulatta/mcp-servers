@@ -39,6 +39,8 @@ Tabs are created with CDP `Target.createTarget(background=true)` in the existing
 
 The application does not guess ownership to remove tabs left behind after disconnection. Connection errors omit endpoint passwords and tokens and suggest checking discovery addresses and relay availability.
 
+The connected Chromium must run with `--disable-features=Prerender2`. A tab that activated a prerendered document has a main frame id different from its target id, and Patchright then waits forever while attaching (microsoft/playwright#41397). One such user tab makes every lookup time out with a connection error even though discovery and the relay are healthy. The malt Neko launch configuration sets this flag; restart Chromium after adding it, because existing affected tabs keep the mismatch.
+
 ## Diagnostics for personal use
 
 This wrapper permits upstream diagnostics and keeps the existing upstream progress callback. Diagnostic files, stderr logs, and progress may contain profile URLs, page text, screenshots, cookie-related metadata, local paths, or original exceptions. They are not a redacted audit channel. Stdout remains reserved for the MCP protocol.
