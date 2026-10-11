@@ -5,7 +5,8 @@ Read-only YouTube MCP server using Bun and TypeScript.
 Current implementation supports stdio initialization, tool discovery, strict
 input validation, safe errors, cancellation, and a 30-second request deadline.
 The YouTube backend is not connected yet: valid reads return
-`UPSTREAM_UNAVAILABLE`. Nothing reads credentials or contacts YouTube yet.
+`UPSTREAM_UNAVAILABLE`. The CDP and account-session adapters are implemented
+and tested separately, but not yet wired into stdio library reads.
 
 ## Development
 
@@ -81,22 +82,51 @@ initialization, discovery, error responses, and shutdown without a browser.
 In-process MCP sessions exercise schema rejection, secret-safe errors,
 deadlines, and cancellation. These tests do not access a personal account.
 
-## Planned scope
+## Browser session boundary
 
-Start with account playlists, Watch Later, liked videos, and watch history.
-Keep YouTube.js behind an adapter, normalize responses, and preserve pagination.
-Add stdio first; HTTP deployment and Nix application packaging are later work.
+Once library reads are wired, authentication is lazy: the first read acquires
+cookies from an existing page in Neko Chromium's default context over CDP.
+Only cookies applicable to `https://www.youtube.com/` enter the in-memory
+YouTube.js session. No cookie file, profile database, or disk authentication
+cache is used. HttpOnly cookies are supported without executing page JavaScript.
 
-Read-only tools are the default. Mutating tools require explicit enablement and
-an approval policy before use. MCP annotations alone do not enforce approval.
-Do not expose raw Innertube calls, cookie setters, or browser/CDP control tools.
+Operator configuration:
 
-Credentials will come from a runtime file, never tool arguments, source files,
-logs, or the Nix store. Follow XDG paths for local configuration and state.
-Do not authenticate, export browser cookies, or run live write tests during setup.
+```sh
+YOUTUBE_CDP_URL=http://127.0.0.1:9222 bun run start
+```
 
-## Next implementation step
+Only HTTP(S) origins are accepted; credentials, path prefixes, query strings,
+and fragments are rejected. Tools cannot override the endpoint. CDP discovery
+redirects are rejected and WebSocket authority is checked. See [UPSTREAM.md](UPSTREAM.md).
 
-Write a failing stdio protocol smoke test before implementing server startup.
-Then add read-only tools with sanitized fixtures and separately opt-in,
-read-only account integration tests. No placeholder passing tests are included.
+Malt exposes CDP on its own loopback `127.0.0.1:9222`. That is not the developer
+machine's loopback. Remote execution requires an operator-managed SSH tunnel
+or running alongside Neko. This package does not create tunnels, expose ports,
+change firewall rules, or deploy Neko. Never expose CDP publicly. Neko UI login
+through Kanidm is separate from the YouTube login and CDP access controls.
+
+On `AUTH_REQUIRED`, open Neko manually and sign into the intended default
+YouTube account. Keep an existing default-context page open. There is no
+automatic login, tab creation, navigation, or account switching. A stable
+channel ID must be readable; missing/ambiguous identity fails closed.
+
+Snapshots last at most five minutes. Concurrent acquisition is shared; a clear
+authentication failure causes at most one reacquisition and first-page retry.
+A changed account permanently yields `ACCOUNT_CHANGED`: confirm the account
+and restart MCP to accept it. Continuations expire when sessions change and
+must be restarted without a cursor. Rate limits and generic permission failures
+do not trigger authentication retries.
+
+Cookie strings and authenticated client objects live only in process memory.
+JavaScript does not guarantee string zeroization. Protect process memory and
+core dumps using deployment controls. CDP and Google cookies themselves grant
+more than read access; restricting this MCP's commands does not reduce those
+underlying privileges. No raw CDP/API or mutating tools are exposed.
+
+## Remaining work
+
+Library response normalization, bounded pagination, and full stdio-to-upstream
+integration remain pending. HTTP deployment, Nix application packaging, and
+all writes are separate changes. Live read-only testing requires explicit
+approval and is not part of the default suite.
