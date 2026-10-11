@@ -62,3 +62,21 @@ This establishes exact background target ownership and initialization cleanup, n
 Existing browser, authentication, extraction, and disconnect tests now use leases. DOM fixtures route only the current owned Page's requests, leaving unrelated pages and service workers alone. The live test now requires request-tab closure before stdio transport shutdown; this live assertion was updated but not executed without a fresh real-profile authorization.
 
 The complete local headed suite reported **37 passed, 1 skipped in 104.79s**. Ruff format/check and strict mypy passed. No real LinkedIn request was made. Admission limits, the complete deadline policy, cleanup-failure retention, and focus observation of the implemented lease remain pending.
+
+## Neko connection blocker: prerender-activated tabs
+
+The first attempt to observe the implemented lease on Neko Chrome 154 never reached tab creation. Patchright `connect_over_cdp` timed out after the WebSocket connected, so the wrapper would have reported a generic `BrowserConnectionError` for every request. The SSH forward, discovery, and Chrome's CDP responses were healthy: every command Patchright sent received a reply.
+
+A temporary instrumented copy of the pinned Patchright driver showed that every target initialized except one existing user tab. Its main frame id differed from its target id. Patchright keys the main frame session by target id, so the initial frame tree was discarded as stale, the main frame URL stayed empty, and initialization waited forever for a first navigation commit. This matches microsoft/playwright#41397, closed as not planned: a tab that activated a prerendered document has this id mismatch. Playwright's own launches avoid it because Chrome disables prerendering in tabs that DevTools controls, while Neko tabs opened by the user are not attached.
+
+Chromium 129, used by the local suite, kept the frame id after a speculation-rules prerender activation, so no automated regression reproduces the mismatch yet. The malt Neko Chromium now runs with `--disable-features=Prerender2`; no other `--disable-features` switch existed for it to override. After deployment, the restored tabs connected in 2.7 seconds. This is an operational prerequisite of the shared browser, not a wrapper workaround, and it does not repair Patchright's handling of such tabs.
+
+## Neko focus observation of the implemented lease
+
+With approval and the user watching the Neko screen, a synthetic probe used `BrowserSession.lease()` through the development CDP forward. Queue task 533 completed in 91 seconds. No LinkedIn request, screen capture, or diagnostic-file inspection occurred.
+
+The first lease created its background tab, navigated to a synthetic data URL, clicked, and scrolled with `window.scrollTo`, `mouse.wheel`, and `scroll_into_view_if_needed`; the wheel also moved the page while the tab was in the background. The probe then waited while the user opened another tab, worked there, returned, and clicked the synthetic tab's button directly. Afterward the probe's own click raised the counter from 9 to 10, confirming exactly one automated click alongside user input. Closing the lease removed its exact target. A second lease received a different target ID, navigated, clicked, and closed. No page present at the start disappeared, and the browser connection stayed alive after session close.
+
+The user saw the synthetic tabs appear in and leave the tab strip, and reported that the selected tab never switched to the synthetic tab without their own selection during creation, navigation, clicks, scrolling, closing, or the second lease. This human observation, not a focus-emulated DOM value, is the acceptance evidence. An earlier run of the same probe asserted an exact counter value and failed only because the requested user interaction also clicked the button; its cleanup still removed the owned tab.
+
+This verifies the implemented lease with synthetic pages. It does not cover real LinkedIn extraction, admission, deadlines, or cleanup-failure recovery, which remain later tasks.
