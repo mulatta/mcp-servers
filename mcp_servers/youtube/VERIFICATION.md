@@ -27,7 +27,11 @@ normalizer. Synthetic regression cases reproduced those failures before the
 fix. The table records the subsequent successful run, not the initial failure.
 The pinned dependency was not upgraded.
 
-## Input and logging checks
+## Historical input and logging checks
+
+This section and the following 60-test record describe the pre-observability
+implementation. The historical zero-byte stderr result above is not an
+expectation for the current default info logger.
 
 - Omitted `limit` becomes **50** through the MCP schema; confirmed with a local
   client. Allowed range: integer 1–100. Live requests explicitly used 5.
@@ -40,7 +44,7 @@ The pinned dependency was not upgraded.
 - Test summaries are not a production audit trail. Request attribution,
   retention, durable audit storage, and debug-mode configuration are absent.
 
-## Local checks
+## Historical local checks
 
 Verified in `nix develop .#youtube`:
 
@@ -73,6 +77,41 @@ Writable tests additionally cover the internal stream queue, UTF-8 byte and
 record limits, whole-record rejection, level-filtered loss reports, write
 throws/callback errors, and the one-second flush timeout. These are local
 results, not additional live reads or performance acceptance evidence.
+
+## External measurement record template
+
+Follow the [external procedure](README.md#external-latency-verification).
+This table is a template, not a new account measurement or a benchmark command.
+Record tool name, limit, log level, runtime, collector conditions, approved scope,
+attempt/preparation counts, and total budget before filling it in. Defaults are
+five attempts per condition and five minutes total including preparation.
+Never record private playlist/video/account IDs, titles, or cursors.
+
+| Condition | Attempts | Successes with server timing | Failures / safe codes | Server median / min / max ms | Client round-trip median / min / max ms | Startup median / min / max ms | Missing logs / skipped / stop reason |
+| ------------------- | -------: | ---------------------------: | --------------------- | ---------------------------- | --------------------------------------- | ----------------------------- | ------------------------------------ |
+| Cold authentication | — | — | — | — | — | — | — |
+| Warm authentication | — | — | — | — | — | N/A | — |
+| Same-cursor replay | — | — | — | — | — | N/A | — |
+
+Also report client-observed successes without matched server timing separately.
+The success count used for each timing statistic must match that statistic's
+available samples. A missing or ambiguous record is not a failed query and must
+not shift later completions onto the wrong requests. Preparation is excluded
+from latency samples but included in total requests and elapsed budget.
+
+**Synthetic arithmetic example, not measured latency:** five attempts produce
+successful server durations of 10, 20, and 30 ms, one `UPSTREAM_UNAVAILABLE`,
+and one `TIMEOUT`. Report 3 successes, median 20 ms, min 10 ms, max 30 ms,
+and 2 failures. Client round-trip and startup are N/A if not independently
+measured. With no successes, all success-duration statistics are N/A.
+
+Stop immediately on `AUTH_REQUIRED`, `ACCOUNT_CHANGED`, `UPSTREAM_BLOCKED`, or
+`RATE_LIMITED`; stop and cancel the pending request on budget exhaustion.
+Other failures are separate from successful latency samples. Preserve partial
+results and the reason for stopping; missing cursors or failed preparation
+produce explicit skips. No p95, fixed latency pass/fail threshold, SLO, or
+automatic architecture/implementation classification is implied. Further real
+account measurements require fresh approval covering preparation and repeats.
 
 ## Remaining limits
 
