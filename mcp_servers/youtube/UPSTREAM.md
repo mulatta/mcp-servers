@@ -9,12 +9,18 @@ was accessed for this inspection.
   will be supplied. Player retrieval is unnecessary for library reads.
 - `dist/src/utils/HTTPClient.js` adds cookies and derives SAPISID authentication.
   `Session.logged_in` is initially just `!!cookie`; it is **not** proof of login.
-- `account.getInfo()` calls the read-only accounts-list endpoint using the TV
-  client and returns `AccountInfo`. Its parsed `page` retains
-  `AccountSectionList.footers`, whose `AccountChannel.endpoint` can identify a
-  channel. Accept only an unambiguous `UC...` browse ID from that account page;
-  fail closed if absent. Do not use display names, cookie hashes, or mutable
-  handles as stable identity. Actual account compatibility remains unverified.
+- `account.getInfo()` uses the TV accounts-list endpoint, but channel footers
+  are optional. A public MediaServiceCore accounts-list fixture has no footer.
+  Do not assume that method provides a stable channel ID.
+- Identity uses a fixed read-only `/browse` request for `SPaccount_advanced`,
+  parsed by YouTube.js. Accept exactly one distinct `UC` plus 22-character ID
+  from `CopyLink.short_url`; fail closed if absent or ambiguous. This settings
+  read is documented in upstream issue #783. Do not use display names, cookie
+  hashes, mutable handles, or account-switch tokens as identity. Accounts
+  without an identifiable channel fail safely; live compatibility is unverified.
+- Generate session context locally and disable Innertube config/player
+  retrieval. This avoids unrelated bootstrap requests and lets transport
+  restrict authenticated traffic to the fixed YouTube browse endpoint.
 - `account.getInfo(true)` lists accounts using WEB and has `is_selected`, but
   `AccountItem` does not expose a stable channel ID as a dedicated field. Do not
   execute switch-account service endpoints to derive identity.
@@ -26,7 +32,15 @@ was accessed for this inspection.
 Local source references are under `node_modules/youtubei.js/dist/src/`:
 `core/Session.js`, `core/managers/AccountManager.js`, `utils/HTTPClient.js`,
 `utils/Log.js`, `parser/youtube/AccountInfo.js`,
-`parser/classes/AccountSectionList.js`, and `parser/classes/AccountChannel.js`.
+`parser/classes/AccountSectionList.js`, `parser/classes/AccountChannel.js`,
+`parser/classes/SettingsOptions.js`, and `parser/classes/CopyLink.js`.
+
+Latest upstream inspected: `bad89d2657e88f907011655f199fba9fb615c339`
+(`main`). AccountItem still has no dedicated immutable channel-ID property.
+Issue <https://github.com/LuanRT/YouTube.js/issues/783> is a closed historical
+accounts-list 400 report, not proof of a current regression or released fix.
+The settings fixture used here is source-derived and synthetic, not captured
+personal account data. Real-response library fixtures remain a separate task.
 
 ## Chromium CDP
 
