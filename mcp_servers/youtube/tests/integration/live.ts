@@ -6,51 +6,36 @@ if (process.env.YOUTUBE_LIVE_READONLY !== "1") {
   );
   process.exit(2);
 }
-const playlistId = process.env.YOUTUBE_LIVE_PLAYLIST_ID;
-const expectedAccount = process.env.YOUTUBE_LIVE_ACCOUNT_ID;
-if (
-  !playlistId ||
-  !/^[A-Za-z0-9_-]{2,150}$/.test(playlistId) ||
-  !expectedAccount ||
-  !/^UC[A-Za-z0-9_-]{22}$/.test(expectedAccount)
-) {
-  console.error(
-    "Set YOUTUBE_LIVE_PLAYLIST_ID and YOUTUBE_LIVE_ACCOUNT_ID from the intended browser account.",
-  );
-  process.exit(2);
-}
 
-const { createReader } = await import("../../src/reader.ts");
-const { toolNames } = await import("../../src/server.ts");
-const { withDeadline } = await import("../../src/deadline.ts");
-const { SafeError, safeError } = await import("../../src/errors.ts");
-const { resultSchema } = await import("../../src/youtube/normalize.ts");
-
+const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+const { StdioClientTransport } =
+  await import("@modelcontextprotocol/sdk/client/stdio.js");
+const { checkTools } = await import("./check-tools.ts");
+const { safeError } = await import("../../src/errors.ts");
+const client = new Client({ name: "youtube-live-check", version: "1" });
+const transport = new StdioClientTransport({
+  command: process.execPath,
+  args: [new URL("../../src/index.ts", import.meta.url).pathname],
+  env: {
+    YOUTUBE_CDP_URL: process.env.YOUTUBE_CDP_URL ?? "http://127.0.0.1:9222",
+  },
+  stderr: "pipe",
+});
+let stderrBytes = 0;
+// Count diagnostics without copying a potentially sensitive child log.
+transport.stderr?.on("data", (chunk) => {
+  stderrBytes += chunk.length;
+});
 try {
-  const reader = createReader();
-  for (const name of toolNames) {
-    const result = resultSchema.parse(
-      await withDeadline(new AbortController().signal, 30_000, (signal) =>
-        reader(
-          name,
-          {
-            limit: 1,
-            ...(name === "youtube_get_playlist"
-              ? { playlist_id: playlistId }
-              : {}),
-          },
-          signal,
-        ),
-      ),
-    );
-    if (result.account_id !== expectedAccount)
-      throw new SafeError("ACCOUNT_CHANGED");
-    // Report bounded evidence, not titles, IDs, history, or session material.
-    console.log(
-      `${name}: account matched; items=${result.items.length}; has_more=${result.has_more}`,
-    );
-  }
+  await client.connect(transport, { timeout: 5000 });
+  const reports = await checkTools(client);
+  for (const report of reports) console.log(JSON.stringify(report));
+  console.log(JSON.stringify({ server_stderr_bytes: stderrBytes }));
+  if (reports.some((report) => report.status === "error") || stderrBytes)
+    process.exitCode = 1;
 } catch (error) {
   console.error(safeError(error).message);
   process.exitCode = 1;
+} finally {
+  await client.close();
 }
