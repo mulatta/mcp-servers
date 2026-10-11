@@ -1,0 +1,23 @@
+{
+  "name": "youtube-mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "bun run typecheck && bun run format:check"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "youtubei.js": "18.1.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2"
+  }
+}
