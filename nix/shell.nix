@@ -7,7 +7,19 @@ let
   inherit (pkgs) lib;
 
   editablePythonSet = pythonSet.overrideScope (
-    workspace.mkEditablePyprojectOverlay { root = "$REPO_ROOT"; }
+    lib.composeManyExtensions [
+      (workspace.mkEditablePyprojectOverlay { root = "$REPO_ROOT"; })
+      (final: prev: {
+        linkedin-mcp = prev.linkedin-mcp.overrideAttrs (old: {
+          # Hatchling requires editables only when building a PEP 660 wheel.
+          nativeBuildInputs =
+            (old.nativeBuildInputs or [ ])
+            ++ final.resolveBuildSystem {
+              editables = [ ];
+            };
+        });
+      })
+    ]
   );
   virtualenv = editablePythonSet.mkVirtualEnv "mcp-servers-dev" workspace.deps.all;
 
