@@ -126,7 +126,7 @@ changes or reconstruct entries YouTube never returned.
 ## Tests
 
 ```sh
-bun test tests
+bun run test
 ```
 
 The protocol suite starts a real Bun subprocess and MCP client to check
@@ -175,6 +175,26 @@ JavaScript does not guarantee string zeroization. Protect process memory and
 core dumps using deployment controls. CDP and Google cookies themselves grant
 more than read access; restricting this MCP's commands does not reduce those
 underlying privileges. No raw CDP/API or mutating tools are exposed.
+
+## Opt-in live read check
+
+Do not run this without the account owner's explicit approval. It reads one
+item per tool, prints only counts/account-match status, and never modifies
+account data. Set the expected channel ID and an existing playlist ID after
+checking them manually in Neko. IDs are not cookie or authentication values.
+
+```sh
+YOUTUBE_LIVE_READONLY=1 \
+YOUTUBE_LIVE_ACCOUNT_ID=UC_REPLACE_WITH_CHANNEL_ID \
+YOUTUBE_LIVE_PLAYLIST_ID=PL_REPLACE_WITH_PLAYLIST_ID \
+YOUTUBE_CDP_URL=http://127.0.0.1:9222 \
+bun run test:live
+```
+
+Without opt-in the command exits before loading the reader or contacting CDP.
+It is not a `*.test.ts` file and is excluded from the default test command.
+The default suite uses local protocol fixtures, not Neko or YouTube.
+See [VERIFICATION.md](VERIFICATION.md) for recorded verification limits.
 
 ## Verification boundary
 
