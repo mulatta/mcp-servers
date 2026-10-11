@@ -1,8 +1,11 @@
 # YouTube MCP
 
-Preparation scaffold for a Bun + TypeScript MCP server backed by YouTube.js.
-No MCP transport or tools are implemented yet. Nothing reads credentials or
-contacts YouTube.
+Read-only YouTube MCP server using Bun and TypeScript.
+
+Current implementation supports stdio initialization, tool discovery, strict
+input validation, safe errors, cancellation, and a 30-second request deadline.
+The YouTube backend is not connected yet: valid reads return
+`UPSTREAM_UNAVAILABLE`. Nothing reads credentials or contacts YouTube yet.
 
 ## Development
 
@@ -22,6 +25,61 @@ TypeScript is checked separately with
 `bun run typecheck`; Bun execution alone does not type-check TypeScript.
 Runtime and development dependencies are pinned in `package.json` and `bun.lock`.
 `nix develop` and `nix develop .#youtube` provide the same Bun shell.
+
+## Run over stdio
+
+From `mcp_servers/youtube`, run:
+
+```sh
+bun run start
+```
+
+Connect an MCP client rather than typing interactive commands. Configure the
+client command as `bun`, arguments as `run src/index.ts`, and working directory
+as the absolute path to `mcp_servers/youtube`. Stdout contains only MCP protocol
+messages; diagnostics must go to stderr without session details.
+
+Tool discovery does not require a running browser or credentials.
+
+## Tools
+
+| Tool | Purpose | Required input |
+| --------------------------- | ----------------- | -------------- |
+| `youtube_list_playlists` | Account playlists | None |
+| `youtube_get_playlist` | Playlist contents | `playlist_id` |
+| `youtube_get_watch_later` | Watch Later | None |
+| `youtube_get_liked_videos` | Liked videos | None |
+| `youtube_get_watch_history` | Watch history | None |
+
+All tools accept optional `limit` (integer 1–100, default 50) and `cursor`.
+Playlist IDs contain letters, digits, `_`, or `-`; URLs are not accepted.
+Unknown arguments are rejected before backend access. All five tools declare
+read-only, non-destructive annotations. No write or arbitrary API tools exist.
+
+Example MCP call arguments:
+
+```json
+{
+  "name": "youtube_get_playlist",
+  "arguments": { "playlist_id": "WL", "limit": 20 }
+}
+```
+
+Execution failures use `isError: true` with a text content block containing
+JSON with safe `code` and `message` fields. Raw upstream exceptions are never
+returned. Client cancellation aborts the operation; requests exceeding 30
+seconds return `TIMEOUT` and abort their backend signal.
+
+## Tests
+
+```sh
+bun test tests
+```
+
+The protocol suite starts a real Bun subprocess and MCP client to check
+initialization, discovery, error responses, and shutdown without a browser.
+In-process MCP sessions exercise schema rejection, secret-safe errors,
+deadlines, and cancellation. These tests do not access a personal account.
 
 ## Planned scope
 
