@@ -14,6 +14,8 @@ export function libraryServer(
   let accountId = "UCaaaaaaaaaaaaaaaaaaaaaa";
   let authFailures = 0;
   let reads = 0;
+  let stall = false;
+  let aborted = 0;
   const paths: string[] = [];
   const upstream = Bun.serve({
     hostname: "127.0.0.1",
@@ -29,6 +31,17 @@ export function libraryServer(
       if (body.browseId === "SPaccount_advanced")
         return Response.json(accountPage(accountId));
       reads++;
+      if (stall)
+        return new Promise<Response>((resolve) => {
+          req.signal.addEventListener(
+            "abort",
+            () => {
+              aborted++;
+              resolve(new Response(null, { status: 499 }));
+            },
+            { once: true },
+          );
+        });
       if (authFailures-- > 0) return new Response(null, { status: 401 });
       if (body.browseId === "FEplaylist_aggregation")
         return Response.json(playlists);
@@ -97,6 +110,12 @@ export function libraryServer(
     paths,
     get reads() {
       return reads;
+    },
+    get aborted() {
+      return aborted;
+    },
+    set stall(value: boolean) {
+      stall = value;
     },
     set accountId(id: string) {
       accountId = id;
