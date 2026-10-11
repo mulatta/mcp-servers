@@ -17,6 +17,7 @@ export class SessionProvider<T> {
   private pinned: string | undefined;
   private changed = false;
   private generation = 0;
+  private invalidationListeners = new Set<() => void>();
   private flight: Flight<T> | undefined;
   constructor(
     private load: (
@@ -33,15 +34,23 @@ export class SessionProvider<T> {
     );
   }
 
+  onInvalidate(listener: () => void) {
+    this.invalidationListeners.add(listener);
+    return () => this.invalidationListeners.delete(listener);
+  }
+
   invalidate(snapshot?: Snapshot<T>) {
-    if (!snapshot || this.snapshot === snapshot) this.snapshot = undefined;
+    if (!snapshot || this.snapshot === snapshot) {
+      this.snapshot = undefined;
+      for (const listener of this.invalidationListeners) listener();
+    }
   }
 
   async get(signal: AbortSignal): Promise<Snapshot<T>> {
     signal.throwIfAborted();
     if (this.changed) throw new SafeError("ACCOUNT_CHANGED");
     if (this.snapshot && this.isCurrent(this.snapshot)) return this.snapshot;
-    this.snapshot = undefined;
+    this.invalidate();
     if (!this.flight) {
       const controller = new AbortController();
       const started = this.now();
