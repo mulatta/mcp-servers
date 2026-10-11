@@ -200,6 +200,22 @@ See [VERIFICATION.md](VERIFICATION.md) for recorded verification limits.
 
 ## Logging and audit
 
+### Structured diagnostic contract
+
+The observability module accepts `YOUTUBE_LOG_LEVEL=error|warn|info|debug`,
+with `info` as the default. Empty or unknown values are rejected without
+printing their contents. There is no separate `YOUTUBE_DEBUG` flag.
+Process wiring is described below; this contract does not enable upstream logs.
+
+Records use JSONL with `schema_version: 1`, UTC `timestamp`, `level`, and a
+fixed `event`. Permitted data is limited to internally generated correlation
+IDs, fixed stage/tool/result names, validated limits, counts, finite durations,
+cache states, and safe error codes. Unknown fields are discarded; invalid
+records are omitted rather than printed as raw diagnostic failures.
+Cookies, authorization headers, CDP URLs, account/video/playlist IDs, titles,
+cursors, raw arguments/responses/exceptions, and hashes of those values are
+never diagnostic fields. Requested MCP results remain on protocol stdout.
+
 There is no debug-mode flag or persistent audit logger. YouTube.js logging is
 disabled to avoid leaking authentication or raw responses. Stdout is reserved
 for MCP messages, including requested tool results. Stderr normally stays

@@ -15,6 +15,10 @@ const messages = {
 } as const;
 export type ErrorCode = keyof typeof messages;
 
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === "string" && Object.hasOwn(messages, value);
+}
+
 export class SafeError extends Error {
   constructor(readonly code: ErrorCode) {
     super(messages[code]);
