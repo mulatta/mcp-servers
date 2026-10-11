@@ -1,5 +1,6 @@
 import { SessionProvider, type Snapshot } from "./auth/session.ts";
 import { SafeError } from "./errors.ts";
+import { stage, recordCache } from "./observability/trace.ts";
 import type { ReadInput, ToolName } from "./server.ts";
 import type { YoutubeClient } from "./youtube/client.ts";
 import { resultEnvelope, type Item, type Result } from "./youtube/normalize.ts";
@@ -63,6 +64,14 @@ export class Paginator {
     input: ReadInput,
     signal: AbortSignal,
   ): Promise<Result> {
+    return stage("pagination", () => this.readPage(name, input, signal));
+  }
+
+  private async readPage(
+    name: ToolName,
+    input: ReadInput,
+    signal: AbortSignal,
+  ): Promise<Result> {
     signal.throwIfAborted();
     this.sessions.assertAccountUnchanged();
     this.trim();
@@ -96,7 +105,18 @@ export class Paginator {
           this.now() >= state.created + 300_000
         )
           throw new SafeError("CURSOR_EXPIRED");
-        if (state.result) return structuredClone(state.result);
+        if (state.result) {
+          recordCache("page_cache", "replay");
+          return structuredClone(state.result);
+        }
+        recordCache(
+          "page_cache",
+          state.pending
+            ? "shared"
+            : state.buffer.length >= input.limit || !state.continuation
+              ? "buffer"
+              : "miss",
+        );
         if (!state.pending) {
           state.pending = this.compute(
             name,
@@ -122,6 +142,7 @@ export class Paginator {
         }
         return structuredClone(await state.pending);
       }
+      recordCache("page_cache", "miss");
       const page = await snapshot.value.page(name, input, signal);
       return this.compute(
         name,
