@@ -57,6 +57,23 @@ modern continuation and Shorts layouts, cursor replay and TTL/LRU/memory bounds,
 cancellation, deadlines, examples, default-limit behavior, and live opt-in guards.
 The default suite still does not access Neko or YouTube.
 
+## Observability writer: local verification
+
+Bun 1.4.2 subprocess tests exercise actual stderr pipes independently of
+YouTube, Neko, or an account. A worker attempts 30,000 safe diagnostic records
+while its parent does not consume stderr. It still reports progress over
+stdout, with at most 256 outstanding records and 256 KiB tracked bytes.
+After consumption resumes, every emitted line parses as JSON and emitted
+start records plus reported losses account for all 30,000 attempts.
+Closing the parent's stderr pipe disables logging while the worker continues
+and exits successfully. These checks verify the writer, not yet complete MCP
+lifecycle or stage tracing; those remain separate integration work.
+
+Writable tests additionally cover the internal stream queue, UTF-8 byte and
+record limits, whole-record rejection, level-filtered loss reports, write
+throws/callback errors, and the one-second flush timeout. These are local
+results, not additional live reads or performance acceptance evidence.
+
 ## Remaining limits
 
 This verifies five items per tool on one authenticated account, not exhaustive
