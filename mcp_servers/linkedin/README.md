@@ -35,7 +35,9 @@ Upstream saved-account selection and subsequent navigation back to the profile a
 
 Each request leases a fresh background tab in the existing context. Lookups remain serialized, including tab cleanup. Success, failure, and cancellation all trigger cleanup of that request's tab; the healthy CDP connection is reused, not the tab. Server shutdown disconnects the client without closing user tabs, the browser, or its login session. Connection loss fails the in-flight request; the next explicit request reconnects. Failed requests are never replayed automatically.
 
-Tabs are created with CDP `Target.createTarget(background=true)` in the existing default context. The returned target ID is recorded before Page initialization, matched against Patchright Pages by CDP target identity, and used for cleanup even when initialization fails or is cancelled. There is no foreground fallback or focus-restoration call. Bounded admission, the complete operation/cleanup deadline policy, and blocked-cleanup recovery are still pending.
+Tabs are created with CDP `Target.createTarget(background=true)` in the existing default context. The returned target ID is recorded before Page initialization, matched against Patchright Pages by CDP target identity, and used for cleanup even when initialization fails or is cancelled. There is no foreground fallback or focus-restoration call. The complete operation/cleanup deadline policy and blocked-cleanup recovery are still pending.
+
+Each server process admits one running lookup and one waiting lookup. The running slot is held until its tab cleanup finishes. A further call fails immediately with a tool error starting `LinkedIn lookup is busy`, before creating a tab or calling upstream code; retry after a lookup finishes. Cancelling a waiting call returns its slot without affecting the running lookup. The limit is per process, not shared between separate MCP server processes.
 
 The application does not guess ownership to remove tabs left behind after disconnection. Connection errors omit endpoint passwords and tokens and suggest checking discovery addresses and relay availability.
 
