@@ -66,6 +66,34 @@ function list(value: unknown): unknown[] {
   return value;
 }
 
+function continuationToken(endpoint: unknown): string {
+  const tokens = new Set<string>();
+  let visited = 0;
+  function visit(value: unknown, depth = 0) {
+    if (depth > 8 || ++visited > 64) throw new SafeError("UPSTREAM_CHANGED");
+    const command = object(value);
+    const continuation = object(command.continuationCommand);
+    if (typeof continuation.token === "string" && continuation.token) {
+      if (
+        continuation.request !== undefined &&
+        continuation.request !== "CONTINUATION_REQUEST_TYPE_BROWSE"
+      )
+        throw new SafeError("UPSTREAM_CHANGED");
+      tokens.add(continuation.token);
+    }
+    for (const key of ["innertubeCommand", "command", "performOnceCommand"]) {
+      if (command[key]) visit(command[key], depth + 1);
+    }
+    const commands = object(command.commandExecutorCommand).commands;
+    if (commands !== undefined)
+      for (const nested of list(commands)) visit(nested, depth + 1);
+  }
+  // Extract only the browse token; UI and mutation commands are never executed.
+  visit(endpoint);
+  if (tokens.size !== 1) throw new SafeError("UPSTREAM_CHANGED");
+  return [...tokens][0]!;
+}
+
 export function normalize(raw: unknown, kind: Kind): Page {
   const page: Page = { items: [], continuation: null };
   let recognized = false;
@@ -95,6 +123,7 @@ export function normalize(raw: unknown, kind: Kind): Page {
       "playlistVideoListRenderer",
       "richGridRenderer",
       "gridRenderer",
+      "reelShelfRenderer",
       "playlistVideoListContinuation",
       "sectionListContinuation",
       "itemSectionContinuation",
@@ -131,13 +160,14 @@ export function normalize(raw: unknown, kind: Kind): Page {
     }
     if (n.richItemRenderer)
       return walk(object(n.richItemRenderer).content, group);
-    if (n.continuationItemRenderer) {
+    if (n.continuationItemRenderer || n.continuationItemViewModel) {
       recognized = true;
       setContinuation(
-        object(
-          object(object(n.continuationItemRenderer).continuationEndpoint)
-            .continuationCommand,
-        ).token,
+        continuationToken(
+          n.continuationItemRenderer
+            ? object(n.continuationItemRenderer).continuationEndpoint
+            : object(n.continuationItemViewModel).continuationCommand,
+        ),
       );
       return;
     }
@@ -180,14 +210,24 @@ export function normalize(raw: unknown, kind: Kind): Page {
       const v = object(
         n.playlistVideoRenderer ?? n.videoRenderer ?? n.gridVideoRenderer,
       );
+      const short = object(n.shortsLockupViewModel);
       if (
         !Object.keys(v).length &&
+        !n.shortsLockupViewModel &&
         lockup.contentType !== "LOCKUP_CONTENT_TYPE_VIDEO"
       )
         throw new SafeError("UPSTREAM_CHANGED");
       if (v.style === "PLAYLIST_VIDEO_RENDERER_STYLE_RECOMMENDED_VIDEO") return;
-      const title = text(v.title ?? lockupTitle);
-      const vid = id(v.videoId ?? lockup.contentId, videoId);
+      const title = text(
+        v.title ?? lockupTitle ?? object(short.overlayMetadata).primaryText,
+      );
+      const shortEndpoint = object(object(short.onTap).innertubeCommand);
+      const vid = id(
+        v.videoId ??
+          lockup.contentId ??
+          object(shortEndpoint.reelWatchEndpoint).videoId,
+        videoId,
+      );
       const availability =
         title === "[Private video]"
           ? "private"
