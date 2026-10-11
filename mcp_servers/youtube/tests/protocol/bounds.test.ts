@@ -97,6 +97,24 @@ test("auth refresh discards cursors without replay and invalidation releases sta
   }
 });
 
+test("account-change lock remains authoritative for previously issued cursors", async () => {
+  const f = libraryServer({ pages: [2] });
+  const pager = new Paginator(f.sessions);
+  try {
+    const first = await pager.read(name, { limit: 1 }, signal());
+    f.accountId = "UCbbbbbbbbbbbbbbbbbbbbbb";
+    f.authFailures = 1;
+    await expect(
+      pager.read(name, { limit: 1 }, signal()),
+    ).rejects.toMatchObject({ code: "ACCOUNT_CHANGED" });
+    await expect(
+      pager.read(name, { limit: 1, cursor: first.next_cursor! }, signal()),
+    ).rejects.toMatchObject({ code: "ACCOUNT_CHANGED" });
+  } finally {
+    f.close();
+  }
+});
+
 test("cancellation prevents later pages and cached continuation replay", async () => {
   const f = libraryServer({ pages: [1, 1] });
   const pager = new Paginator(f.sessions);
