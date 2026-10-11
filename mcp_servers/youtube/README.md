@@ -184,8 +184,12 @@ into YouTube in Neko, run the check through the actual stdio MCP client. It
 requests five items per tool, chooses a playlist ID from the first response
 (or WL if none is listed), and checks account consistency across responses.
 No manual channel or playlist ID is required. Short lists may return fewer
-than five items. It prints only counts, safe error codes, timings, and stderr
-byte count, never titles, IDs, cookies, or raw server diagnostics.
+than five items. It prints only counts, safe error codes, timings, stderr byte count, and a
+safe diagnostic-validation summary, never titles, IDs, cookies, or raw server
+diagnostics. Valid nonempty JSONL is expected, not a failure. The checker
+rejects malformed, oversized, truncated, or non-allowlisted diagnostics using
+a bounded incremental parser. `YOUTUBE_LOG_LEVEL` is forwarded to the child.
+This remains a five-tool smoke check, not a performance benchmark.
 
 ```sh
 YOUTUBE_LIVE_READONLY=1 \
