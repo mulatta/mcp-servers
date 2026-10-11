@@ -2,11 +2,10 @@
 
 Read-only YouTube MCP server using Bun and TypeScript.
 
-Current implementation supports stdio initialization, tool discovery, strict
-input validation, safe errors, cancellation, and a 30-second request deadline.
-The YouTube backend is not connected yet: valid reads return
-`UPSTREAM_UNAVAILABLE`. The CDP and account-session adapters are implemented
-and tested separately, but not yet wired into stdio library reads.
+Five read-only tools are connected to the CDP session provider, YouTube.js
+adapter, normalization, and bounded pagination. Stdio discovery is credential
+free; actual reads authenticate lazily. Local integration tests pass. Personal
+account compatibility has not been live-verified.
 
 ## Development
 
@@ -137,7 +136,7 @@ deadlines, and cancellation. These tests do not access a personal account.
 
 ## Browser session boundary
 
-Once library reads are wired, authentication is lazy: the first read acquires
+Authentication is lazy: the first read acquires
 cookies from an existing page in Neko Chromium's default context over CDP.
 Only cookies applicable to `https://www.youtube.com/` enter the in-memory
 YouTube.js session. No cookie file, profile database, or disk authentication
@@ -177,9 +176,13 @@ core dumps using deployment controls. CDP and Google cookies themselves grant
 more than read access; restricting this MCP's commands does not reduce those
 underlying privileges. No raw CDP/API or mutating tools are exposed.
 
-## Remaining work
+## Verification boundary
 
-Full stdio-to-upstream integration remains pending. Library response
-normalization and bounded pagination are implemented behind the internal adapter. HTTP deployment, Nix application packaging, and
-all writes are separate changes. Live read-only testing requires explicit
-approval and is not part of the default suite.
+Local integration covers stdio through HTTP/WebSocket CDP and upstream
+fixtures, including cancellation, timeout, account changes, and secret-safe
+failures. This is not proof that a personal account's current YouTube response
+matches those fixtures. Unsupported structures fail closed.
+
+HTTP deployment, Nix application packaging, and all writes are separate
+changes. Live read-only testing requires explicit approval and is not part
+of the default suite.
