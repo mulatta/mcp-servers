@@ -55,6 +55,20 @@ installed 18.1.0 and the inspected upstream commit:
 - `ReelShelf.items` and `ShortsLockupView.onTap` / `overlayMetadata` describe
   history Shorts. Normalize them in place to retain order and date grouping.
 
+A later approved live read found two more fields that installed 18.1.0 parses
+(`ThumbnailOverlayBadgeView`, `ContentMetadataView`) but our raw normalizer
+skipped:
+
+- Lockup playlists carry their size only as a thumbnail badge text such as
+  `N videos` or `N lessons`. Mixes show `Mix` and keep a null count.
+- Video lockups put the channel in the first metadata row part.
+- Some `playlistVideoRenderer` items omit `shortBylineText`, `ownerText`, and
+  `longBylineText` entirely while staying playable with length and view data.
+  They are not multi-channel collaborations; the cause is unknown. Their
+  `channel_name` stays null because recovering it would need per-video `/next`
+  reads outside the fixed browse endpoint.
+- History Shorts carry no channel in the browse response.
+
 Shape-only live observations became synthetic regression cases in
 `tests/protocol/modern-layouts.test.ts`. No live response bodies, identifiers,
 or credential-bearing payloads were copied into fixtures. No dependency
