@@ -146,3 +146,135 @@ test("ambiguous continuation bundles and unknown shelf entries still fail closed
     ),
   ).toThrow();
 });
+
+const playlistLockup = (
+  id: string,
+  badge: string,
+  contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST",
+) => ({
+  richItemRenderer: {
+    content: {
+      lockupViewModel: {
+        contentId: id,
+        contentType,
+        contentImage: {
+          collectionThumbnailViewModel: {
+            primaryThumbnail: {
+              thumbnailViewModel: {
+                overlays: [
+                  {
+                    thumbnailOverlayBadgeViewModel: {
+                      thumbnailBadges: [
+                        { thumbnailBadgeViewModel: { text: badge } },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        metadata: {
+          lockupMetadataViewModel: { title: { content: "Fixture playlist" } },
+        },
+      },
+    },
+  },
+});
+
+const playlistGrid = (contents: unknown[]) => ({
+  contents: {
+    twoColumnBrowseResultsRenderer: {
+      tabs: [
+        {
+          tabRenderer: {
+            selected: true,
+            content: { richGridRenderer: { contents } },
+          },
+        },
+      ],
+    },
+  },
+});
+
+test("lockup playlists read counts from thumbnail badges", () => {
+  const result = normalize(
+    playlistGrid([
+      playlistLockup("PLfixture0000000001", "3,890 videos"),
+      playlistLockup("PLfixture0000000002", "1 video"),
+      playlistLockup(
+        "PLfixture0000000003",
+        "7 lessons",
+        "LOCKUP_CONTENT_TYPE_COURSE",
+      ),
+      playlistLockup("RDfixture0000000004", "Mix"),
+      playlistLockup("PLfixture0000000005", "1.2K videos"),
+    ]),
+    "playlists",
+  );
+  expect(
+    result.items.map((item) => "playlist_id" in item && item.playlist_id),
+  ).toEqual([
+    "PLfixture0000000001",
+    "PLfixture0000000002",
+    "PLfixture0000000003",
+    "RDfixture0000000004",
+    "PLfixture0000000005",
+  ]);
+  expect(
+    result.items.map((item) => "video_count" in item && item.video_count),
+  ).toEqual([3890, 1, 7, null, null]);
+});
+
+test("playlist lockups of unknown content types are rejected", () => {
+  expect(() =>
+    normalize(
+      playlistGrid([
+        playlistLockup("PLfixture0000000001", "1 video"),
+        playlistLockup(
+          "PLfixture0000000002",
+          "1 video",
+          "LOCKUP_CONTENT_TYPE_VIDEO",
+        ),
+      ]),
+      "playlists",
+    ),
+  ).toThrow();
+});
+
+test("lockup videos read the channel from the first metadata row", () => {
+  const result = normalize(
+    page([
+      {
+        lockupViewModel: {
+          ...video.lockupViewModel,
+          metadata: {
+            lockupMetadataViewModel: {
+              title: { content: "Fixture video" },
+              metadata: {
+                contentMetadataViewModel: {
+                  metadataRows: [
+                    {
+                      metadataParts: [{ text: { content: "Fixture channel" } }],
+                    },
+                    {
+                      metadataParts: [
+                        { text: { content: "16K views" } },
+                        { text: { content: "4 days ago" } },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+      video,
+    ]),
+    "videos",
+  );
+  expect(
+    result.items.map((item) => "channel_name" in item && item.channel_name),
+  ).toEqual(["Fixture channel", null]);
+});

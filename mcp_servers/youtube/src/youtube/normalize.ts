@@ -58,6 +58,32 @@ function text(value: unknown): string | null {
     return v.runs.map((r) => object(r).text).join("");
   return null;
 }
+function first(value: unknown): unknown {
+  return Array.isArray(value) ? value[0] : undefined;
+}
+// Lockup playlists carry their size only as a thumbnail badge such as "3,890 videos".
+function badgeCount(lockup: Record<string, unknown>): number | null {
+  const thumbnail = object(
+    object(
+      object(object(lockup.contentImage).collectionThumbnailViewModel)
+        .primaryThumbnail,
+    ).thumbnailViewModel,
+  );
+  for (const overlay of Array.isArray(thumbnail.overlays)
+    ? thumbnail.overlays
+    : []) {
+    const badges = object(
+      object(overlay).thumbnailOverlayBadgeViewModel,
+    ).thumbnailBadges;
+    for (const badge of Array.isArray(badges) ? badges : []) {
+      const match = /^([\d,]+) (?:videos?|lessons?)$/.exec(
+        String(object(object(badge).thumbnailBadgeViewModel).text),
+      );
+      if (match) return Number(match[1]!.replaceAll(",", ""));
+    }
+  }
+  return null;
+}
 function id(value: unknown, pattern: RegExp): string | null {
   return typeof value === "string" && pattern.test(value) ? value : null;
 }
@@ -187,20 +213,23 @@ export function normalize(raw: unknown, kind: Kind): Page {
       return;
     }
     const lockup = object(n.lockupViewModel);
-    const lockupTitle = object(
+    const lockupMetadata = object(
       object(lockup.metadata).lockupMetadataViewModel,
-    ).title;
+    );
+    const lockupTitle = lockupMetadata.title;
     if (kind === "playlists") {
       const p = object(n.gridPlaylistRenderer ?? n.playlistRenderer);
+      // Saved courses are listed beside playlists and are addressed by a playlist ID.
       if (
         !Object.keys(p).length &&
-        lockup.contentType !== "LOCKUP_CONTENT_TYPE_PLAYLIST"
+        lockup.contentType !== "LOCKUP_CONTENT_TYPE_PLAYLIST" &&
+        lockup.contentType !== "LOCKUP_CONTENT_TYPE_COURSE"
       )
         throw new SafeError("UPSTREAM_CHANGED");
       const count =
         typeof p.videoCount === "string" && /^\d+$/.test(p.videoCount)
           ? Number(p.videoCount)
-          : null;
+          : badgeCount(lockup);
       page.items.push({
         playlist_id: id(p.playlistId ?? lockup.contentId, playlistId),
         title: text(p.title ?? lockupTitle),
@@ -243,7 +272,21 @@ export function normalize(raw: unknown, kind: Kind): Page {
         title,
         url: vid ? `https://www.youtube.com/watch?v=${vid}` : null,
         channel_name: text(
-          v.shortBylineText ?? v.ownerText ?? v.longBylineText,
+          v.shortBylineText ??
+            v.ownerText ??
+            v.longBylineText ??
+            // Video lockups put the channel first in their metadata rows.
+            object(
+              first(
+                object(
+                  first(
+                    object(
+                      object(lockupMetadata.metadata).contentMetadataViewModel,
+                    ).metadataRows,
+                  ),
+                ).metadataParts,
+              ),
+            ).text,
         ),
         availability,
         ...(kind === "history" ? { watched_at: null, group_label: group } : {}),
