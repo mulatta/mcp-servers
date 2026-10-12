@@ -26,6 +26,7 @@ export type CheckReport = {
   items?: number;
   has_more?: boolean;
   account_consistent?: boolean;
+  null_fields?: string[];
   code?: string;
   elapsed_ms: number;
 };
@@ -75,12 +76,23 @@ export async function checkTools(client: Client): Promise<CheckReport[]> {
         if (first && "playlist_id" in first && first.playlist_id)
           playlistId = first.playlist_id;
       }
+      // shortcut: field moves inside known lockups are caught only by this live check,
+      // move field extraction onto youtubei.js parsers if another such fix is needed.
+      const nullFields = result.items.length
+        ? ["video_count", "channel_name"].filter((field) =>
+            result.items.every(
+              (item) =>
+                field in item && item[field as keyof typeof item] === null,
+            ),
+          )
+        : [];
       reports.push({
         ...base,
         status: "ok",
         items: result.items.length,
         has_more: result.has_more,
         account_consistent: true,
+        null_fields: nullFields,
         elapsed_ms: Math.round(performance.now() - started),
       });
     } catch (error) {
