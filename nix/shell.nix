@@ -16,7 +16,7 @@ in
     ];
   };
 
-  youtube = pkgs.mkShell {
+  youtube = pkgs.mkShellNoCC {
     packages = [ pkgs.bun ];
   };
 }
