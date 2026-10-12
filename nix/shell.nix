@@ -1,10 +1,6 @@
 { pkgs }:
-let
-  youtube = pkgs.mkShell {
+{
+  youtube = pkgs.mkShellNoCC {
     packages = [ pkgs.bun ];
   };
-in
-{
-  inherit youtube;
-  default = youtube;
 }
