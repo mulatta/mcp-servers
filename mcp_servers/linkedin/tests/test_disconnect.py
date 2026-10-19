@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 
 import pytest
 from linkedin_mcp.browser import BrowserConnectionError, BrowserSession
-from patchright.async_api import Page, async_playwright
+from patchright.async_api import Error, Page, async_playwright
 
 
 class Relay:
@@ -78,8 +78,8 @@ async def relay_for(websocket: str) -> AsyncIterator[tuple[Relay, str]]:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("in_flight", [False, True], ids=["idle", "in-flight"])
-async def test_disconnect_reconnect(chromium: tuple[str, str], in_flight: bool) -> None:
+@pytest.mark.parametrize("mode", ["idle", "in-flight", "swallowed", "translated"])
+async def test_disconnect_reconnect(chromium: tuple[str, str], mode: str) -> None:
     async with (
         async_playwright() as observer,
         relay_for(chromium[1]) as (relay, endpoint),
@@ -93,7 +93,7 @@ async def test_disconnect_reconnect(chromium: tuple[str, str], in_flight: bool) 
             async with context.expect_page() as created, session.acquire() as page:
                 await page.set_content("<title>Disposable relay test</title>")
             orphan = await created.value
-            if in_flight:
+            if mode != "idle":
                 started = asyncio.Event()
                 calls = 0
 
@@ -102,7 +102,16 @@ async def test_disconnect_reconnect(chromium: tuple[str, str], in_flight: bool) 
                     async with session.acquire() as page:
                         calls += 1
                         started.set()
-                        await page.wait_for_function("() => false", timeout=10000)
+                        try:
+                            await page.wait_for_function("() => false", timeout=10000)
+                        except Error:
+                            if mode == "swallowed":
+                                return
+                            if mode == "translated":
+                                raise ValueError(
+                                    "Extractor reported missing content"
+                                ) from None
+                            raise
 
                 task = asyncio.create_task(request())
                 await started.wait()
