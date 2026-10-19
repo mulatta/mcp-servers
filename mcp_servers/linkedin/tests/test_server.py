@@ -63,9 +63,15 @@ async def test_invalid_input_does_not_connect(arguments: dict[str, Any]) -> None
 async def test_profile_result_from_real_dom(chromium: tuple[str, str]) -> None:
     session = BrowserSession(chromium[0])
     try:
-        async with session.acquire() as page:
+        async with session.lease() as page:
 
             async def serve(route: Route) -> None:
+                if (
+                    route.request.service_worker is not None
+                    or route.request.frame.page is not session.page
+                ):
+                    await route.continue_()
+                    return
                 await route.fulfill(
                     status=200,
                     content_type="text/html",
@@ -78,7 +84,7 @@ async def test_profile_result_from_real_dom(chromium: tuple[str, str]) -> None:
                 """,
                 )
 
-            await page.route("**/*", serve)
+            await page.context.route("**/*", serve)
         async with Client(create_server(session)) as client:
             result = await client.call_tool(
                 "get_person_profile",
