@@ -20,7 +20,11 @@ from linkedin_mcp_server.linkedin.identifiers import normalize_person_identifier
 from patchright.async_api import Error
 from pydantic import Field
 
-from linkedin_mcp.browser import BrowserConnectionError, BrowserSession
+from linkedin_mcp.browser import (
+    BrowserBusyError,
+    BrowserConnectionError,
+    BrowserSession,
+)
 
 
 def create_server(session: BrowserSession) -> FastMCP:
@@ -90,7 +94,7 @@ def create_server(session: BrowserSession) -> FastMCP:
             raise ToolError(
                 "LinkedIn limited this request. Inspect Neko and wait before retrying."
             ) from None
-        except BrowserConnectionError as error:
+        except (BrowserBusyError, BrowserConnectionError) as error:
             raise ToolError(str(error)) from None
         except ToolError:
             raise
