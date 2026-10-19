@@ -26,7 +26,7 @@ async def chromium(tmp_path: Path) -> AsyncIterator[tuple[str, str]]:
         pytest.fail("Set TEST_CHROMIUM to a local Chromium executable")
     process = await asyncio.create_subprocess_exec(
         executable,
-        "--headless=new",
+        *([] if os.environ.get("TEST_HEADED") == "1" else ["--headless=new"]),
         "--remote-debugging-address=127.0.0.1",
         "--remote-debugging-port=0",
         f"--user-data-dir={tmp_path / 'profile'}",
