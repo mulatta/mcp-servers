@@ -54,3 +54,11 @@ The next implementation step adds background creation to `BrowserSession` withou
 The initial regression run exposed the missing background flag and cancellation delayed by the old connection-wide shield. After implementation, all three cases passed. The complete suite on local **headed Chromium 129.0.6668.29**, using the project's Nix environment and pinned Patchright, reported **34 passed, 1 skipped in 77.51s**. The skipped case was the opt-in real-profile lookup; no shared Neko or LinkedIn lookup was used in this run. Ruff format/check and strict mypy passed. Set `TEST_HEADED=1` with `TEST_CHROMIUM` to reproduce the headed test mode.
 
 This establishes exact background target ownership and initialization cleanup, not the later request-scoped lease or blocked-cleanup recovery contract. Creation-response loss, complete operation/cleanup deadlines, and cleanup-failure retention remain subsequent tasks. The earlier Neko user observation is separate evidence; these automated checks do not infer visible focus from JavaScript state.
+
+## Request-scoped tab leases
+
+`BrowserSession.lease()` now separates the healthy connection lifetime from each request's target lifetime. The lease regressions first failed because the previous implementation kept successful request tabs open. After the change, sequential requests use different target IDs on the same Browser and driver objects; successful, failed, and cancelled requests close their tabs while retaining a healthy connection. The observer verifies that user tabs and the external browser survive final session shutdown.
+
+Existing browser, authentication, extraction, and disconnect tests now use leases. DOM fixtures route only the current owned Page's requests, leaving unrelated pages and service workers alone. The live test now requires request-tab closure before stdio transport shutdown; this live assertion was updated but not executed without a fresh real-profile authorization.
+
+The complete local headed suite reported **37 passed, 1 skipped in 104.79s**. Ruff format/check and strict mypy passed. No real LinkedIn request was made. Admission limits, the complete deadline policy, cleanup-failure retention, and focus observation of the implemented lease remain pending.
