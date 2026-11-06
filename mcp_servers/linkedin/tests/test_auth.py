@@ -16,9 +16,15 @@ async def test_auth_and_extraction_errors(
     session = BrowserSession(chromium[0])
     submitted: list[str] = []
     try:
-        async with session.acquire() as page:
+        async with session.lease() as page:
 
             async def serve(route: Route) -> None:
+                if (
+                    route.request.service_worker is not None
+                    or route.request.frame.page is not session.page
+                ):
+                    await route.continue_()
+                    return
                 url = route.request.url
                 if "/submitted" in url:
                     submitted.append(url)
@@ -39,7 +45,7 @@ async def test_auth_and_extraction_errors(
                         <button type='submit'>Continue</button></form></main>"""
                 await route.fulfill(status=200, content_type="text/html", body=html)
 
-            await page.route("**/*", serve)
+            await page.context.route("**/*", serve)
         async with Client(create_server(session)) as client:
             message = "extraction failed" if state == "empty" else "Neko"
             with pytest.raises(ToolError, match=message):
@@ -58,10 +64,16 @@ async def test_saved_account_selection_can_resume(chromium: tuple[str, str]) -> 
     selected = False
     visits = 0
     try:
-        async with session.acquire() as page:
+        async with session.lease() as page:
 
             async def serve(route: Route) -> None:
                 nonlocal selected, visits
+                if (
+                    route.request.service_worker is not None
+                    or route.request.frame.page is not session.page
+                ):
+                    await route.continue_()
+                    return
                 if "/selected" in route.request.url:
                     selected = True
                     await route.fulfill(status=200, body="ok")
@@ -78,7 +90,7 @@ async def test_saved_account_selection_can_resume(chromium: tuple[str, str]) -> 
                 )
                 await route.fulfill(status=200, content_type="text/html", body=html)
 
-            await page.route("**/*", serve)
+            await page.context.route("**/*", serve)
         async with Client(create_server(session)) as client:
             result = await client.call_tool(
                 "get_person_profile",

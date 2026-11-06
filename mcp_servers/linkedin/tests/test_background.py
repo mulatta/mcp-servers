@@ -157,7 +157,7 @@ async def test_background_target_ownership(
         async def request() -> None:
             with anyio.CancelScope() as scope:
                 scope_ready.set_result(scope)
-                async with session.acquire() as page:
+                async with session.lease() as page:
                     assert session._browser is not None
                     assert page.context is session._browser.contexts[0]
                     cdp = await page.context.new_cdp_session(page)

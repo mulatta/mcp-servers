@@ -91,7 +91,7 @@ async def test_disconnect_reconnect(chromium: tuple[str, str], mode: str) -> Non
         session = BrowserSession(endpoint)
         orphan: Page | None = None
         try:
-            async with context.expect_page() as created, session.acquire() as page:
+            async with context.expect_page() as created, session.lease() as page:
                 await page.set_content("<title>Disposable relay test</title>")
             orphan = await created.value
             if mode != "idle":
@@ -100,7 +100,7 @@ async def test_disconnect_reconnect(chromium: tuple[str, str], mode: str) -> Non
 
                 async def request() -> None:
                     nonlocal calls
-                    async with session.acquire() as page:
+                    async with session.lease() as page:
                         calls += 1
                         started.set()
                         try:
@@ -114,8 +114,10 @@ async def test_disconnect_reconnect(chromium: tuple[str, str], mode: str) -> Non
                                 ) from None
                             raise
 
-                task = asyncio.create_task(request())
-                await started.wait()
+                async with context.expect_page() as in_flight:
+                    task = asyncio.create_task(request())
+                    await started.wait()
+                orphan = await in_flight.value
                 relay.drop()
                 with pytest.raises(BrowserConnectionError, match="CDP connection"):
                     await asyncio.wait_for(task, timeout=10)
@@ -126,7 +128,7 @@ async def test_disconnect_reconnect(chromium: tuple[str, str], mode: str) -> Non
                 async with asyncio.timeout(10):
                     while session._browser.is_connected():
                         await asyncio.sleep(0.01)
-            async with session.acquire() as page:
+            async with session.lease() as page:
                 await page.set_content("<main>Reconnected</main>")
                 assert await page.locator("main").inner_text() == "Reconnected"
             assert browser.is_connected()
@@ -171,7 +173,7 @@ async def test_discovery_success_then_websocket_failure() -> None:
         session = BrowserSession(f"http://127.0.0.1:{port}")
         try:
             with pytest.raises(BrowserConnectionError, match="discovery.*relay"):
-                async with session.acquire():
+                async with session.lease():
                     pytest.fail("Unavailable WebSocket must not connect")
             assert requests == ["/json/version/", "/unavailable"]
             assert session.page is None
@@ -197,7 +199,7 @@ async def test_connection_error_hides_secrets(
         )
         try:
             with pytest.raises(BrowserConnectionError) as caught:
-                async with session.acquire():
+                async with session.lease():
                     pytest.fail("Refusing server must not connect")
             output = capsys.readouterr()
             assert not output.out
