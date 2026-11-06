@@ -57,4 +57,22 @@ Tests never navigate existing tabs. Profile and authentication tests fulfill req
 
 Disconnect tests close only sockets belonging to a test-specific TCP relay, not Neko or an existing SSH tunnel. A separate observer cleans up only exact tab handles created by the tests. The shared browser is never terminated or forcibly logged out.
 
-Twenty-two tests cover CDP lifetime, MCP initialization, tool listing, input constraints, and profile extraction, authentication, and empty-result handling with fixed DOM fixtures. They passed against Neko Chrome 154 through development-only SSH local forwarding. A user-authorized live profile lookup also succeeded over stdio: after an authwall error, the user signed in through Neko and retried successfully. Explicit transport shutdown closed the exact dedicated tab while preserving existing tabs. The verification client uses `StdioTransport(keep_alive=False)`; the default True keeps the server alive after the client connection scope exits, so tab closure must not be expected then. Direct execution on malt and production Nix packaging still require separate opt-in verification.
+Twenty-three automatic tests cover CDP lifetime, MCP initialization, tool listing, input constraints, and profile extraction, authentication, and empty-result handling with fixed DOM fixtures. They passed against Neko Chrome 154 through development-only SSH local forwarding. A user-authorized live profile lookup also succeeded over stdio: after an authwall error, the user signed in through Neko and retried successfully. Explicit transport shutdown closed the exact dedicated tab while preserving existing tabs. The verification client uses `StdioTransport(keep_alive=False)`; the default True keeps the server alive after the client connection scope exits, so tab closure must not be expected then. Direct execution on malt and production Nix packaging still require separate opt-in verification.
+
+## Opt-in verification on malt
+
+Run these commands on the malt host, not inside a separate container. Keep the existing Neko relay and firewall configuration unchanged. Sign in through the Neko UI first; Kanidm UI authentication does not authenticate CDP.
+
+The automatic connection tests accept the HTTP discovery URL and the explicit WebSocket address returned by its `/json/version` endpoint. Confirm that this address is reachable from the MCP process. The relay forwards TCP unchanged; neither the application nor this procedure rewrites discovery responses. A separate local test server verifies that successful discovery followed by a rejected WebSocket produces a connection error with relay guidance.
+
+For one real profile lookup and stdio shutdown verification, supply only a profile you are authorized to read:
+
+```sh
+TEST_CDP_URL=http://127.0.0.1:9222 \
+LINKEDIN_TEST_PROFILE=https://www.linkedin.com/in/YOUR-AUTHORIZED-PROFILE/ \
+uv run pytest mcp_servers/linkedin/tests/test_live.py -q
+```
+
+This live test is skipped unless `LINKEDIN_TEST_PROFILE` is set. It checks the main profile, preserves existing tabs, explicitly shuts down the stdio transport, and verifies that the exact newly created tab closes. It does not force logout, solve checkpoints, or print profile content on success. To test a packaged server, set `LINKEDIN_MCP_EXECUTABLE` to its absolute executable path.
+
+If LinkedIn asks for authentication, complete it manually in Neko and rerun the command. Record a saved-account chooser separately if one appears naturally; do not sign out or alter cookies to force that state. Development-only SSH forwarding is not evidence that the MCP has run directly on malt.
