@@ -9,7 +9,15 @@ from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
 
 import anyio
-from patchright.async_api import Browser, Error, Page, Playwright, async_playwright
+from patchright.async_api import (
+    Browser,
+    BrowserContext,
+    CDPSession,
+    Error,
+    Page,
+    Playwright,
+    async_playwright,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +41,8 @@ class BrowserSession:
         self.page: Page | None = None
         self._driver: Playwright | None = None
         self._browser: Browser | None = None
+        self._control: CDPSession | None = None
+        self._target_id: str | None = None
         self._lock = asyncio.Lock()
 
     async def _connect(self) -> Page:
@@ -48,19 +58,60 @@ class BrowserSession:
                 )
                 if not self._browser.contexts:
                     raise RuntimeError("CDP browser has no existing default context")
-                self.page = await self._browser.contexts[0].new_page()
+                self._control = await self._browser.new_browser_cdp_session()
+                # Keep the ownership receipt even if Page initialization fails.
+                with anyio.fail_after(15, shield=True):
+                    target = await self._control.send(
+                        "Target.createTarget",
+                        {"url": "about:blank", "background": True},
+                    )
+                    self._target_id = target["targetId"]
+                self.page = await self._page_for_target(self._browser.contexts[0])
             except Error:
                 raise BrowserConnectionError() from None
         return self.page
+
+    async def _page_for_target(self, context: BrowserContext) -> Page:
+        changed = asyncio.Event()
+
+        def on_page(page: Page) -> None:
+            changed.set()
+
+        context.on("page", on_page)
+        try:
+            with anyio.fail_after(15):
+                while True:
+                    changed.clear()
+                    for page in context.pages:
+                        if page.is_closed():
+                            continue
+                        cdp: CDPSession | None = None
+                        try:
+                            cdp = await context.new_cdp_session(page)
+                            info = (await cdp.send("Target.getTargetInfo"))[
+                                "targetInfo"
+                            ]
+                            if info["targetId"] == self._target_id:
+                                return page
+                        except Error:
+                            if not page.is_closed():
+                                raise
+                        finally:
+                            if cdp is not None:
+                                with anyio.move_on_after(1, shield=True):
+                                    try:
+                                        await cdp.detach()
+                                    except Error:
+                                        pass
+                    await changed.wait()
+        finally:
+            context.remove_listener("page", on_page)
 
     @asynccontextmanager
     async def acquire(self) -> AsyncIterator[Page]:
         async with self._lock:
             try:
-                # Remote resource creation must finish before cancellation can
-                # discard the handle needed to release the newly created tab.
-                with anyio.CancelScope(shield=True):
-                    page = await self._connect()
+                page = await self._connect()
                 await anyio.lowlevel.checkpoint()
                 yield page
                 if self._browser is None or not self._browser.is_connected():
@@ -81,16 +132,30 @@ class BrowserSession:
                 raise
 
     async def _close(self) -> None:
-        page, driver = self.page, self._driver
+        control, target_id, driver = self._control, self._target_id, self._driver
+        self._control = None
+        self._target_id = None
         self.page = None
         self._driver = None
         self._browser = None
         # FastMCP cancels with AnyIO scopes; cleanup must outlive that scope.
         with anyio.CancelScope(shield=True):
             try:
-                if page is not None and not page.is_closed():
+                if control is not None and target_id is not None:
                     with anyio.move_on_after(5) as closing:
-                        await page.close()
+                        await control.send(
+                            "Target.closeTarget", {"targetId": target_id}
+                        )
+                        # closeTarget acknowledges before the target disappears.
+                        while True:
+                            targets = (await control.send("Target.getTargets"))[
+                                "targetInfos"
+                            ]
+                            if not any(
+                                target["targetId"] == target_id for target in targets
+                            ):
+                                break
+                            await anyio.sleep(0.01)
                     if closing.cancel_called:
                         logger.warning(
                             "CDP tab cleanup timed out; owned tab may remain"
