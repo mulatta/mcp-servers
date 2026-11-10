@@ -31,7 +31,11 @@ async function connect(
       return options.onWrite
         ? options.onWrite(path, body)
         : Response.json(
-            path.endsWith("/playlist/create") ? { playlistId: created } : {},
+            path.endsWith("/playlist/create")
+              ? { playlistId: created }
+              : path.endsWith("/browse/edit_playlist")
+                ? { status: "STATUS_SUCCEEDED" }
+                : {},
           );
     },
   });
@@ -70,6 +74,8 @@ test("write tools are absent and unreachable unless their group is enabled", asy
     const names = (await client.listTools()).tools.map((tool) => tool.name);
     expect(names).not.toContain("youtube_create_playlist");
     expect(names).not.toContain("youtube_delete_playlist");
+    expect(names).not.toContain("youtube_add_to_playlist");
+    expect(names).not.toContain("youtube_remove_from_playlist");
     const { result } = await call("youtube_delete_playlist", {
       playlist_id: created,
     });
@@ -252,4 +258,129 @@ test("short and long user playlist IDs both round-trip", async () => {
     expect(gone.result.structuredContent).toMatchObject({ playlist_id: id });
     expect(writes).toHaveLength(2);
   }
+});
+
+const videos = ["v0000000001", "v0000000002"];
+
+test("adding and removing accept user playlists and Watch Later only", async () => {
+  const { call, writes, f } = await connect();
+  for (const name of [
+    "youtube_add_to_playlist",
+    "youtube_remove_from_playlist",
+  ])
+    for (const playlist_id of [
+      "LL",
+      "RDfixture00000000000",
+      "UUfixture0000000000000000",
+      "wl",
+      "PL",
+    ]) {
+      const { result } = await call(name, { playlist_id, video_ids: videos });
+      expect(result.isError).toBe(true);
+    }
+  expect(writes).toEqual([]);
+  expect(f.paths).toEqual([]);
+});
+
+test("video lists that are empty, oversized, malformed or repeated are rejected", async () => {
+  const { call, writes, f } = await connect();
+  for (const video_ids of [
+    [],
+    Array.from({ length: 51 }, (_, i) => `v${String(i).padStart(10, "0")}`),
+    ["short"],
+    ["https://youtu.be/v0000000001"],
+    ["v0000000001", "v0000000001"],
+  ]) {
+    for (const name of [
+      "youtube_add_to_playlist",
+      "youtube_remove_from_playlist",
+    ]) {
+      const { result } = await call(name, { playlist_id: created, video_ids });
+      expect(result.isError).toBe(true);
+    }
+  }
+  expect(writes).toEqual([]);
+  expect(f.paths).toEqual([]);
+});
+
+test("add and remove send one edit with an action per video", async () => {
+  const { call, writes } = await connect();
+  const added = await call("youtube_add_to_playlist", {
+    playlist_id: created,
+    video_ids: videos,
+  });
+  expect(added.result.structuredContent).toEqual({
+    account_id: "UCaaaaaaaaaaaaaaaaaaaaaa",
+    playlist_id: created,
+    video_ids: videos,
+  });
+  const removed = await call("youtube_remove_from_playlist", {
+    playlist_id: "WL",
+    video_ids: videos,
+  });
+  expect(removed.result.structuredContent).toMatchObject({
+    playlist_id: "WL",
+    video_ids: videos,
+  });
+  expect(writes).toEqual([
+    {
+      path: "/youtubei/v1/browse/edit_playlist",
+      body: expect.objectContaining({
+        playlistId: created,
+        actions: videos.map((id) => ({
+          action: "ACTION_ADD_VIDEO",
+          addedVideoId: id,
+        })),
+      }),
+    },
+    {
+      path: "/youtubei/v1/browse/edit_playlist",
+      body: expect.objectContaining({
+        playlistId: "WL",
+        actions: videos.map((id) => ({
+          action: "ACTION_REMOVE_VIDEO_BY_VIDEO_ID",
+          removedVideoId: id,
+        })),
+      }),
+    },
+  ]);
+});
+
+test("an edit without a success status is unknown, and a refusal is not retried", async () => {
+  for (const [label, response, code] of [
+    ["no status", () => Response.json({}), "WRITE_OUTCOME_UNKNOWN"],
+    [
+      "failed status",
+      () => Response.json({ status: "STATUS_FAILED" }),
+      "WRITE_OUTCOME_UNKNOWN",
+    ],
+    [
+      "forbidden",
+      () => new Response(null, { status: 403 }),
+      "PLAYLIST_UNAVAILABLE",
+    ],
+  ] as const) {
+    const { call, writes } = await connect({ onWrite: response });
+    const { code: got } = await call("youtube_add_to_playlist", {
+      playlist_id: created,
+      video_ids: videos,
+    });
+    expect({ label, got }).toEqual({ label, got: code });
+    expect(writes).toHaveLength(1);
+  }
+});
+
+test("removing videos is declared destructive, adding is not", async () => {
+  const { client } = await connect();
+  const tools = Object.fromEntries(
+    (await client.listTools()).tools.map((tool) => [tool.name, tool]),
+  );
+  expect(tools.youtube_add_to_playlist?.annotations).toMatchObject({
+    readOnlyHint: false,
+    destructiveHint: false,
+  });
+  expect(tools.youtube_remove_from_playlist?.annotations).toMatchObject({
+    readOnlyHint: false,
+    destructiveHint: true,
+  });
 });

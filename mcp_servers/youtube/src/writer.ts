@@ -31,6 +31,25 @@ type Operation = {
   ) => Record<string, unknown>;
 };
 
+function edit(action: string, field: string): Operation {
+  return {
+    routes: ["edit_playlist"],
+    path: "/browse/edit_playlist",
+    body: (input) => ({
+      playlistId: input.playlist_id,
+      actions: (input.video_ids as string[]).map((id) => ({
+        action,
+        [field]: id,
+      })),
+    }),
+    result: (data, input) => {
+      if (data.status !== "STATUS_SUCCEEDED")
+        throw new SafeError("WRITE_OUTCOME_UNKNOWN");
+      return { playlist_id: input.playlist_id, video_ids: input.video_ids };
+    },
+  };
+}
+
 const operations: Record<WriteToolName, Operation> = {
   youtube_create_playlist: {
     routes: ["create_playlist"],
@@ -59,6 +78,13 @@ const operations: Record<WriteToolName, Operation> = {
     body: (input) => ({ playlistId: input.playlist_id }),
     result: (_data, input) => ({ playlist_id: input.playlist_id }),
   },
+  youtube_add_to_playlist: edit("ACTION_ADD_VIDEO", "addedVideoId"),
+  // Removing by video ID needs no prior read of the playlist, unlike
+  // YouTube.js removeVideos(), which pages through it for set-video IDs.
+  youtube_remove_from_playlist: edit(
+    "ACTION_REMOVE_VIDEO_BY_VIDEO_ID",
+    "removedVideoId",
+  ),
 };
 
 export function createWriter(sessions: SessionProvider<YoutubeClient>): Writer {

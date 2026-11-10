@@ -148,6 +148,16 @@ export function createServer(
   return server;
 }
 
+// Liked videos (LL) change through ratings, and mixes or uploads are not editable.
+const editablePlaylist = z
+  .string()
+  .refine((id) => id === "WL" || userPlaylistId.test(id));
+// A repeated ID would add the video twice, which is rarely what a caller meant.
+const videoBatch = z
+  .array(z.string().regex(/^[A-Za-z0-9_-]{11}$/))
+  .min(1)
+  .max(50)
+  .refine((ids) => new Set(ids).size === ids.length);
 const writeTools: Record<
   WriteToolName,
   { description: string; input: z.ZodRawShape; destructive: boolean }
@@ -166,6 +176,18 @@ const writeTools: Record<
     description:
       "Permanently delete one of the authenticated account's playlists by its PL playlist ID.",
     input: { playlist_id: z.string().regex(userPlaylistId) },
+    destructive: true,
+  },
+  youtube_add_to_playlist: {
+    description:
+      "Add up to 50 videos to one of the account's playlists or to Watch Later (WL).",
+    input: { playlist_id: editablePlaylist, video_ids: videoBatch },
+    destructive: false,
+  },
+  youtube_remove_from_playlist: {
+    description:
+      "Remove up to 50 videos from one of the account's playlists or from Watch Later (WL).",
+    input: { playlist_id: editablePlaylist, video_ids: videoBatch },
     destructive: true,
   },
 };

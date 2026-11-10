@@ -118,6 +118,8 @@ flakelet module exposes the same list as `writes`.
 | ---------- | ------------------------- | ------------------------------------------------------- | ----------- |
 | `playlist` | `youtube_create_playlist` | `title`, optional `privacy` (default `PRIVATE`), `description` | No |
 | `playlist` | `youtube_delete_playlist` | `playlist_id` (`PL…` only) | Yes |
+| `playlist` | `youtube_add_to_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | No |
+| `playlist` | `youtube_remove_from_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | Yes |
 
 Write tools declare `readOnlyHint: false` and `idempotentHint: false`; deletes
 also declare `destructiveHint: true`. A write is sent once and never retried.
@@ -125,6 +127,9 @@ If it was sent and YouTube did not refuse it with a client error, any later
 failure (timeout, dropped connection, server error, or a response without the
 expected fields) returns `WRITE_OUTCOME_UNKNOWN`: read the target before trying
 again. Diagnostics record the tool and outcome, never the IDs or titles.
+Adding and removing send one `browse/edit_playlist` request with an action per
+video; removal is by video ID, so the playlist is not read first. An edit
+counts as done only when YouTube answers `STATUS_SUCCEEDED`.
 
 Example MCP call arguments:
 
