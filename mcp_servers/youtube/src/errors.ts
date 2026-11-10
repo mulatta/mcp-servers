@@ -1,7 +1,7 @@
 const messages = {
   BROWSER_UNAVAILABLE:
-    "Browser session unavailable. Check Neko and the CDP connection.",
-  AUTH_REQUIRED: "Sign in to YouTube in Neko, then try again.",
+    "Browser session unavailable. Check the browser and its CDP endpoint.",
+  AUTH_REQUIRED: "Sign in to YouTube in the browser, then try again.",
   ACCOUNT_CHANGED:
     "Browser account changed. Confirm the account and restart this server.",
   CURSOR_INVALID: "Cursor does not match this request.",
