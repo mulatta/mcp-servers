@@ -135,7 +135,9 @@ responses contain identical JSON in `structuredContent` and text content:
 All other tools return `video_id`, `title`, `url`, `channel_name`, and
 `availability` (`available`, `private`, `deleted`, `unavailable`, or `null`),
 and `watched_percent`: the 0–100 progress YouTube shows on the thumbnail, or
-`null` when it shows none (unwatched or unknown; never reported as `0`).
+`null` when it shows none (unwatched or unknown; never reported as `0`), and
+`duration_seconds`, read from the exact length or a `H:MM:SS`/`M:SS` label;
+live streams, Shorts and anything else that is not an exact clock report `null`.
 `youtube_get_watch_history` additionally returns `watched_at` and `group_label`.
 `youtube_list_subscriptions` returns `channel_id`, `title`, `handle` (`@name`),
 `subscriber_count_text` as YouTube displays it, and `notification` (`all`,

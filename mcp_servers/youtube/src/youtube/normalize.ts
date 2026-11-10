@@ -16,6 +16,7 @@ const videoSummary = z.strictObject({
     .nullable(),
   // Null means YouTube showed no progress, which covers both unwatched and unknown.
   watched_percent: z.number().int().min(0).max(100).nullable(),
+  duration_seconds: z.number().int().nonnegative().nullable(),
   watched_at: z.string().nullable().optional(),
   group_label: z.string().nullable().optional(),
   published_text: z.string().nullable().optional(),
@@ -101,6 +102,51 @@ function percent(value: unknown): number | null {
   return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 100
     ? Number(value)
     : null;
+}
+// Only exact clock labels count; "LIVE", "Mix" or malformed text stays unknown.
+function clock(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const match = /^(?:(\d+):([0-5]\d)|(\d{1,2})):([0-5]\d)$/.exec(value);
+  if (!match) return null;
+  const [, hours, hourMinutes, minutes, seconds] = match;
+  return hours !== undefined
+    ? Number(hours) * 3600 + Number(hourMinutes) * 60 + Number(seconds)
+    : Number(minutes) * 60 + Number(seconds);
+}
+function duration(
+  video: Record<string, unknown>,
+  lockup: Record<string, unknown>,
+): number | null {
+  if (video.lengthSeconds !== undefined)
+    return typeof video.lengthSeconds === "string" &&
+      /^\d+$/.test(video.lengthSeconds)
+      ? Number(video.lengthSeconds)
+      : null;
+  const length = text(video.lengthText);
+  if (length !== null) return clock(length);
+  for (const overlay of Array.isArray(video.thumbnailOverlays)
+    ? video.thumbnailOverlays
+    : []) {
+    const status = object(overlay).thumbnailOverlayTimeStatusRenderer;
+    if (status) return clock(text(object(status).text));
+  }
+  const found = new Set<number | null>();
+  const thumbnail = object(object(lockup.contentImage).thumbnailViewModel);
+  for (const overlay of Array.isArray(thumbnail.overlays)
+    ? thumbnail.overlays
+    : []) {
+    const o = object(overlay);
+    const badges = [
+      object(o.thumbnailOverlayBadgeViewModel).thumbnailBadges,
+      object(o.thumbnailBottomOverlayViewModel).badges,
+    ].flatMap((list) => (Array.isArray(list) ? list : []));
+    for (const badge of badges) {
+      const seconds = clock(object(object(badge).thumbnailBadgeViewModel).text);
+      if (seconds !== null) found.add(seconds);
+    }
+  }
+  // Two different clocks on one lockup are ambiguous, so neither is reported.
+  return found.size === 1 ? [...found][0]! : null;
 }
 // Renderers carry a resume overlay; lockups carry a bottom progress bar.
 function watchedPercent(
@@ -387,6 +433,7 @@ export function normalize(raw: unknown, kind: Kind): Page {
               ),
         availability,
         watched_percent: watchedPercent(v, lockup),
+        duration_seconds: duration(v, lockup),
         ...(kind === "history" ? { watched_at: null, group_label: group } : {}),
         ...(kind === "channel_videos"
           ? { published_text: published(v, rows) }

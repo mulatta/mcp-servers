@@ -22,6 +22,7 @@ test("channel uploads normalize renderers and lockups with publish labels", () =
       channel_name: null,
       availability: "available",
       watched_percent: 50,
+      duration_seconds: null,
       published_text: "2 days ago",
     },
     {
@@ -31,6 +32,7 @@ test("channel uploads normalize renderers and lockups with publish labels", () =
       channel_name: null,
       availability: "available",
       watched_percent: null,
+      duration_seconds: null,
       published_text: "3 weeks ago",
     },
   ]);

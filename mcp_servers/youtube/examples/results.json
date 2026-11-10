@@ -16,7 +16,8 @@
         "url": null,
         "channel_name": null,
         "availability": "private",
-        "watched_percent": null
+        "watched_percent": null,
+        "duration_seconds": null
       }
     ],
     "next_cursor": null,
@@ -37,7 +38,8 @@
         "url": "https://www.youtube.com/watch?v=v0000000001",
         "channel_name": null,
         "availability": "available",
-        "watched_percent": 100
+        "watched_percent": 100,
+        "duration_seconds": 754
       }
     ],
     "next_cursor": null,
@@ -53,6 +55,7 @@
         "channel_name": null,
         "availability": "available",
         "watched_percent": 100,
+        "duration_seconds": 754,
         "watched_at": null,
         "group_label": "Today"
       }
@@ -84,6 +87,7 @@
         "channel_name": null,
         "availability": "available",
         "watched_percent": null,
+        "duration_seconds": 754,
         "published_text": "2 days ago"
       }
     ],

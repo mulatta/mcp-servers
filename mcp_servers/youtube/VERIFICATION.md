@@ -1,5 +1,24 @@
 # Verification record
 
+## Approved live duration check: 2026-11-10
+
+The account owner asked for each change to be checked live. The stdio server
+ran from the commit that introduced `duration_seconds`, with `YOUTUBE_CDP_URL=http://127.0.0.1:9222`. A
+throwaway client printed only counts; no identifier, title, or response body
+is stored here.
+
+| Tool | Items | `duration_seconds` set | Positive, under 24 h |
+| ---------------------------- | ----: | ---------------------: | -------------------: |
+| `youtube_get_watch_later` | 20 | 20 | 20 |
+| `youtube_get_liked_videos` | 20 | 20 | 20 |
+| `youtube_get_channel_videos` | 20 | 20 | 20 |
+| `youtube_get_watch_history` | 400 | 21 | 21 |
+
+The first 100 history entries were all Shorts, which carry no duration. Over
+four pages, 22 entries carried a channel name (regular videos); 21 of them had
+a duration and progress, and no Shorts entry reported a duration. The one
+regular video without a duration showed no exact clock badge.
+
 ## Approved live browse-read check: 2026-11-10
 
 The account owner asked for a live check of the new browse reads. The stdio
