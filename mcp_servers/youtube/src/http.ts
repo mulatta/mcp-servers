@@ -81,9 +81,13 @@ export async function startHttp(reader: Reader, options: HttpOptions) {
         timeoutMs: options.timeoutMs,
       });
       await mcp.connect(transport);
+      // The transport ignores request.signal; closing the server aborts its handlers.
+      const disconnect = () => void mcp.close();
+      request.signal.addEventListener("abort", disconnect, { once: true });
       try {
         return await transport.handleRequest(request);
       } finally {
+        request.signal.removeEventListener("abort", disconnect);
         await mcp.close();
       }
     },

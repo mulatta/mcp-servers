@@ -214,3 +214,47 @@ test("duplicate allowed Hosts collapse instead of refusing to start", async () =
   });
   expect(calls).toEqual(["youtube_get_watch_later"]);
 });
+
+test("a client disconnect aborts the in-flight read", async () => {
+  const { promise: started, resolve: start } = Promise.withResolvers<void>();
+  const { promise: aborted, resolve: abort } = Promise.withResolvers<void>();
+  const reader: Reader = (_name, _input, signal) => {
+    start();
+    signal.addEventListener("abort", () => abort(), { once: true });
+    return new Promise(() => {});
+  };
+  const server = await startHttp(reader, {
+    hostname: "127.0.0.1",
+    port: 0,
+    token,
+    allowedHosts: ["127.0.0.1"],
+    logger: captureDiagnostics().logger,
+    // Far beyond the assertion window, so only the disconnect can abort the read.
+    timeoutMs: 60_000,
+  });
+  servers.push(server);
+  const client = new AbortController();
+  const response = fetch(server.url, {
+    method: "POST",
+    signal: client.signal,
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "mcp-protocol-version": "2025-06-18",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "youtube_get_watch_later", arguments: { limit: 1 } },
+    }),
+  }).catch(() => undefined);
+  await started;
+  client.abort();
+  await response;
+  const timedOut = Symbol();
+  expect(
+    await Promise.race([aborted, Bun.sleep(2_000).then(() => timedOut)]),
+  ).not.toBe(timedOut);
+});
