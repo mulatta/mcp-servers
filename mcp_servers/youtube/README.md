@@ -249,11 +249,89 @@ Timing starts after SDK input validation and ends when the operation's result
 or safe failure is decided. It excludes MCP serialization/transmission, client
 round-trip, process startup, discovery, and rejected inputs. Measure those
 externally rather than interpreting server duration as end-to-end latency.
-Domain-stage instrumentation is connected separately.
+At debug, `stage.start`/`stage.end` identify these boundaries:
+
+| Stage | Meaning |
+| ------------------ | ----------------------------------------------------- |
+| `auth.wait` | Snapshot acquisition or waiting on a shared refresh |
+| `auth.refresh` | One shared authentication acquisition |
+| `cdp.connect` | Discovery HTTP and WebSocket connection |
+| `cdp.cookies` | Default-context selection, cookie read, and detach |
+| `auth.identity` | Client creation and stable account verification |
+| `upstream.request` | Browse execution through body consumption and parsing |
+| `normalize` | Local page normalization |
+| `pagination` | Page assembly, cursor management, and nested waits |
+
+Stage IDs and parent IDs describe nested **inclusive** durations; do not add
+nested or overlapping times to obtain total request time. Shared authentication
+has its own `refresh_id`, linked from each waiting request. Cancelling one
+waiter does not mark another waiter or the shared refresh as cancelled.
+These are local boundaries, not profiling inside YouTube or arbitrary source
+lines. Logging may lose events under backpressure, so a missing end event is
+not proof that work is still running.
+
+`auth_cache` distinguishes `hit`, `miss`, and `shared`; `mixed` means a request
+crossed states, such as reuse followed by reacquisition. `page_cache` is `miss`
+when upstream work is needed, `buffer` when retained items suffice, `replay`
+for a completed cursor result, or `shared` for another request's pending
+calculation. Cache fields are omitted when execution never reaches the relevant
+boundary. Replays and waiters do not fabricate upstream spans or log cursors.
 
 The opt-in check's summary is test evidence, not a production audit trail.
 Durable storage and retention are not provided. Do not enable upstream verbose
 logging as a substitute: it can expose session material.
+
+## External latency verification
+
+Use an existing MCP client and collect stderr separately. There is no new
+benchmark command, background workload, or automatic performance verdict.
+The five-tool `test:live` command is a smoke check, not this procedure.
+
+1. Obtain fresh account-owner approval for tools, limits, conditions, repeats,
+   preparation reads, and the time budget before touching a real account.
+   Previous five-item approval is not permission for repeated measurements.
+   Use local fixtures when approval is absent.
+1. Fix the tool, input limit, environment, and log level. Run sequentially,
+   without unrelated calls, and isolate condition logs. Default to five
+   **attempts per condition** and a **five-minute total budget**, including
+   preparation and process startup. The external client cancels the current
+   request when the remaining budget expires and starts no further requests.
+1. **Cold authentication:** use a new MCP process for every measured attempt;
+   the target call must be its first authenticated read. This does not reset
+   browser, OS, or YouTube caches. If playlist selection needs a preparation
+   read, obtain the ID beforehand and retain it only in client memory.
+1. **Warm authentication:** in one process, perform a preparation read, then
+   repeat the same input **without a cursor** five times while its snapshot
+   remains valid. Confirm `auth_cache=hit`; refresh/mixed cases do not count
+   as warm samples.
+1. **Cursor replay:** obtain a cursor, call it once to prepare its result, then
+   repeat that **same cursor**, tool, playlist, and limit five times. Do not
+   advance to the returned next cursor. Confirm `page_cache=replay`. If no
+   cursor exists, skip with a reason. Expiry or refresh invalidates the
+   condition; do not silently restart and label new work as replay.
+1. Stop the entire procedure immediately on `AUTH_REQUIRED`, `ACCOUNT_CHANGED`,
+   `UPSTREAM_BLOCKED`, or `RATE_LIMITED`, including during preparation.
+   Record other errors/timeouts separately and continue within the remaining
+   budget. If preparation cannot establish a condition, skip that condition
+   with a reason rather than inventing samples.
+1. Exclude preparation from latency statistics but count it in request totals
+   and budget. Report successful sample count, median/min/max, failure count
+   and safe codes, skipped conditions, missing diagnostics, and any stop
+   reason. With zero successful samples, report latency as **N/A**, not zero.
+   Keep server duration, externally measured client round-trip, and process
+   startup times in separate columns. Do not persist IDs, titles, or cursors.
+1. Generated request IDs identify server trace trees, not client request IDs.
+   Sequential call order helps map complete logs, but losses can make matching
+   ambiguous. Mark such measurements unavailable rather than guessing which
+   completion belongs to which attempt. Never count missing logs as successful
+   zero-duration calls or as confirmed query failures.
+
+Debug tracing changes measurement overhead. State the level and collector
+conditions with results. Do not compute p95 from these small samples, impose a
+fixed SLO, or automatically label a delay as an architecture versus implementation
+problem. Review evidence first; the user sets subsequent performance criteria.
+See [VERIFICATION.md](VERIFICATION.md#external-measurement-record-template)
+for the reporting template and an explicitly synthetic arithmetic example.
 
 ## Verification boundary
 

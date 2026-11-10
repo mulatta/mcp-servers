@@ -27,6 +27,14 @@ test("live check calls five MCP tools with limit five and discovers the playlist
     );
     expect(calls[1]!.input.playlist_id).toBe("PLfixture0000000016");
     expect(reports.map((r) => r.items)).toEqual([2, 5, 5, 5, 5]);
+    // Fixture lockups carry no count badge and only history names channels.
+    expect(reports.map((r) => r.null_fields)).toEqual([
+      ["video_count"],
+      ["channel_name"],
+      ["channel_name"],
+      ["channel_name"],
+      [],
+    ]);
     expect(
       reports.every((r) => r.status === "ok" && r.account_consistent),
     ).toBe(true);

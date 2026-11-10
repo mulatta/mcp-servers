@@ -1,15 +1,17 @@
 import { accountPage } from "./account.ts";
 import playlists from "./library/playlists.json";
 import history from "./library/history.json";
-import { cdpFixture } from "./cdp.ts";
+import { cdpFixture, cookie } from "./cdp.ts";
 import { SessionProvider } from "../../src/auth/session.ts";
 import { YoutubeClient } from "../../src/youtube/client.ts";
 import { acquireCookies } from "../../src/auth/cdp.ts";
 
 export function libraryServer(
-  options: { pages?: number[]; now?: () => number } = {},
+  options: { pages?: number[]; now?: () => number; cookieValue?: string } = {},
 ) {
-  const browser = cdpFixture();
+  const browser = cdpFixture({
+    cookies: [cookie({ value: options.cookieValue ?? "fixture-secret" })],
+  });
   const pages = options.pages ?? [2];
   let accountId = "UCaaaaaaaaaaaaaaaaaaaaaa";
   let authFailures = 0;
