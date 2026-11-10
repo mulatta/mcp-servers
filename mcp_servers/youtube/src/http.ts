@@ -46,11 +46,11 @@ const rejection = (status: 401 | 403 | 404 | 405) =>
 
 export async function startHttp(reader: Reader, options: HttpOptions) {
   if (!validToken(options.token)) throw new ConfigError("INVALID_HTTP_CONFIG");
-  const allowed = new Set(
-    options.allowedHosts.map((host) => hostnameOf(host)).filter(Boolean),
-  );
-  if (!allowed.size || allowed.size !== options.allowedHosts.length)
+  // Each entry is checked on its own; spellings of one hostname may repeat.
+  const parsed = options.allowedHosts.map(hostnameOf);
+  if (!parsed.length || parsed.some((host) => !host))
     throw new ConfigError("INVALID_HTTP_CONFIG");
+  const allowed = new Set(parsed);
   // Hashing first gives timingSafeEqual equal-length inputs for any presented token.
   const expected = digest(options.token);
   const authorized = (header: string | null) => {

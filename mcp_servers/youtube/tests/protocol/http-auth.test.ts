@@ -197,3 +197,20 @@ test("refuses to start without an allowed Host", async () => {
     }),
   ).rejects.toThrow();
 });
+
+test("duplicate allowed Hosts collapse instead of refusing to start", async () => {
+  const { calls, reader } = spyReader();
+  const server = await startHttp(reader, {
+    hostname: "127.0.0.1",
+    port: 0,
+    token,
+    allowedHosts: ["127.0.0.1", "127.0.0.1", "localhost", "LOCALHOST"],
+    logger: captureDiagnostics().logger,
+  });
+  servers.push(server);
+  await rpc(server.url, token, "tools/call", {
+    name: "youtube_get_watch_later",
+    arguments: { limit: 1 },
+  });
+  expect(calls).toEqual(["youtube_get_watch_later"]);
+});
