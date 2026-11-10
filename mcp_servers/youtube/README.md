@@ -2,10 +2,11 @@
 
 Read-only YouTube MCP server using Bun and TypeScript.
 
-Current implementation supports stdio initialization, tool discovery, strict
-input validation, safe errors, cancellation, and a 30-second request deadline.
-The YouTube backend is not connected yet: valid reads return
-`UPSTREAM_UNAVAILABLE`. Nothing reads credentials or contacts YouTube yet.
+Five read-only tools are connected to the CDP session provider, YouTube.js
+adapter, normalization, and bounded pagination. Stdio discovery is credential
+free; actual reads authenticate lazily. Local integration tests pass. An
+approved live check returned five items from each tool on one account;
+see [VERIFICATION.md](VERIFICATION.md) for scope and remaining limits.
 
 ## Development
 
@@ -70,10 +71,63 @@ JSON with safe `code` and `message` fields. Raw upstream exceptions are never
 returned. Client cancellation aborts the operation; requests exceeding 30
 seconds return `TIMEOUT` and abort their backend signal.
 
+## Results
+
+[Validated examples](examples/results.json) cover all five tools. Successful
+responses contain identical JSON in `structuredContent` and text content:
+
+- `account_id`: verified, pinned channel ID, not a display name or email.
+- `items`: ordered summaries, including repeats and explicit placeholders.
+- `next_cursor`: opaque in-process cursor or `null`.
+- `has_more`: whether `next_cursor` is non-null.
+
+`youtube_list_playlists` returns `playlist_id`, `title`, and `video_count`.
+All other tools return `video_id`, `title`, `url`, `channel_name`, and
+`availability` (`available`, `private`, `deleted`, `unavailable`, or `null`).
+`youtube_get_watch_history` additionally returns `watched_at` and `group_label`.
+Current supported history structures do not provide exact watch timestamps:
+`watched_at` is `null`. Relative labels such as `Today` stay in `group_label`.
+
+Unknown values are `null`, never guessed from display text. Explicit private
+or deleted entries remain in the list. YouTube may hide unavailable items
+entirely; this server cannot recover them or promise a complete archive.
+An unsupported response is an error, not an empty success.
+
+## Pagination
+
+Use [examples/walk.ts](examples/walk.ts) with an initialized MCP SDK client:
+
+```ts
+for await (const page of walk(client, "youtube_get_watch_later", {
+  limit: 20,
+})) {
+  consume(page.items);
+}
+```
+
+This is explicit client-side iteration, not automatic server-side traversal.
+Keep tool, playlist ID, and limit unchanged when passing `next_cursor`.
+Replaying a still-valid cursor returns the same page. Empty `items` with a
+non-null cursor is valid: follow that cursor instead of assuming completion.
+The server makes at most three additional upstream requests per page.
+
+Cursors last at most five minutes and exist only in this process. State is
+limited to 128 cursors and 16 MiB of serialized retained data, evicted by LRU.
+Session refresh, restart, and eviction produce `CURSOR_EXPIRED`. Discard the
+incomplete accumulation and start without a cursor; never silently append a
+restarted traversal to old results. `examples/walk.ts` surfaces expiry rather
+than automatically restarting. The local MCP fixture test runs both traversal
+and explicit recovery.
+
+This is not an immutable snapshot. Browser/account changes can invalidate
+cursors, and concurrent YouTube edits may change ordering between requests.
+The server preserves duplicates and source order; it cannot repair remote
+changes or reconstruct entries YouTube never returned.
+
 ## Tests
 
 ```sh
-bun test tests
+bun run test
 ```
 
 The protocol suite starts a real Bun subprocess and MCP client to check
@@ -81,22 +135,133 @@ initialization, discovery, error responses, and shutdown without a browser.
 In-process MCP sessions exercise schema rejection, secret-safe errors,
 deadlines, and cancellation. These tests do not access a personal account.
 
-## Planned scope
+## Browser session boundary
 
-Start with account playlists, Watch Later, liked videos, and watch history.
-Keep YouTube.js behind an adapter, normalize responses, and preserve pagination.
-Add stdio first; HTTP deployment and Nix application packaging are later work.
+Authentication is lazy: the first read acquires
+cookies from an existing page in Neko Chromium's default context over CDP.
+Only cookies applicable to `https://www.youtube.com/` enter the in-memory
+YouTube.js session. No cookie file, profile database, or disk authentication
+cache is used. HttpOnly cookies are supported without executing page JavaScript.
 
-Read-only tools are the default. Mutating tools require explicit enablement and
-an approval policy before use. MCP annotations alone do not enforce approval.
-Do not expose raw Innertube calls, cookie setters, or browser/CDP control tools.
+Operator configuration:
 
-Credentials will come from a runtime file, never tool arguments, source files,
-logs, or the Nix store. Follow XDG paths for local configuration and state.
-Do not authenticate, export browser cookies, or run live write tests during setup.
+```sh
+YOUTUBE_CDP_URL=http://127.0.0.1:9222 bun run start
+```
 
-## Next implementation step
+Only HTTP(S) origins are accepted; credentials, path prefixes, query strings,
+and fragments are rejected. Tools cannot override the endpoint. CDP discovery
+redirects are rejected and WebSocket authority is checked. See [UPSTREAM.md](UPSTREAM.md).
 
-Write a failing stdio protocol smoke test before implementing server startup.
-Then add read-only tools with sanitized fixtures and separately opt-in,
-read-only account integration tests. No placeholder passing tests are included.
+Malt exposes CDP on its own loopback `127.0.0.1:9222`. That is not the developer
+machine's loopback. Remote execution requires an operator-managed SSH tunnel
+or running alongside Neko. This package does not create tunnels, expose ports,
+change firewall rules, or deploy Neko. Never expose CDP publicly. Neko UI login
+through Kanidm is separate from the YouTube login and CDP access controls.
+
+On `AUTH_REQUIRED`, open Neko manually and sign into the intended default
+YouTube account. Keep an existing default-context page open. There is no
+automatic login, tab creation, navigation, or account switching. A stable
+channel ID must be readable; missing/ambiguous identity fails closed.
+
+Snapshots last at most five minutes. Concurrent acquisition is shared; a clear
+authentication failure causes at most one reacquisition and first-page retry.
+A changed account permanently yields `ACCOUNT_CHANGED`: confirm the account
+and restart MCP to accept it. Continuations expire when sessions change and
+must be restarted without a cursor. Rate limits and generic permission failures
+do not trigger authentication retries.
+
+Cookie strings and authenticated client objects live only in process memory.
+JavaScript does not guarantee string zeroization. Protect process memory and
+core dumps using deployment controls. CDP and Google cookies themselves grant
+more than read access; restricting this MCP's commands does not reduce those
+underlying privileges. No raw CDP/API or mutating tools are exposed.
+
+## Opt-in live read check
+
+Do not run this without the account owner's explicit approval. After logging
+into YouTube in Neko, run the check through the actual stdio MCP client. It
+requests five items per tool, chooses a playlist ID from the first response
+(or WL if none is listed), and checks account consistency across responses.
+No manual channel or playlist ID is required. Short lists may return fewer
+than five items. It prints only counts, safe error codes, timings, stderr byte count, and a
+safe diagnostic-validation summary, never titles, IDs, cookies, or raw server
+diagnostics. Valid nonempty JSONL is expected, not a failure. The checker
+rejects malformed, oversized, truncated, or non-allowlisted diagnostics using
+a bounded incremental parser. `YOUTUBE_LOG_LEVEL` is forwarded to the child.
+This remains a five-tool smoke check, not a performance benchmark.
+
+```sh
+YOUTUBE_LIVE_READONLY=1 \
+YOUTUBE_CDP_URL=http://127.0.0.1:9222 \
+bun run test:live
+```
+
+Without opt-in the command exits before loading the reader or contacting CDP.
+It is not a `*.test.ts` file and is excluded from the default test command.
+The default suite uses local protocol fixtures, not Neko or YouTube.
+See [VERIFICATION.md](VERIFICATION.md) for recorded verification limits.
+
+## Logging and audit
+
+### Structured diagnostic contract
+
+The server accepts `YOUTUBE_LOG_LEVEL=error|warn|info|debug`, with `info` as
+the default. Empty or unknown values stop startup without printing their
+contents or contacting CDP. There is no separate `YOUTUBE_DEBUG` flag.
+This contract does not enable upstream logs.
+
+Records use JSONL with `schema_version: 1`, UTC `timestamp`, `level`, and a
+fixed `event`. Permitted data is limited to internally generated correlation
+IDs, fixed stage/tool/result names, validated limits, counts, finite durations,
+cache states, and safe error codes. Unknown fields are discarded; invalid
+records are omitted rather than printed as raw diagnostic failures.
+Cookies, authorization headers, CDP URLs, account/video/playlist IDs, titles,
+cursors, raw arguments/responses/exceptions, and hashes of those values are
+never diagnostic fields. Requested MCP results remain on protocol stdout.
+
+The writer retains at most 256 outstanding records or 256 KiB of UTF-8 JSONL,
+including newlines and writes pending inside the stream. New records are
+lost on saturation; after successful output resumes, `logs.dropped` reports
+unreported losses at warn level (filtered when configured at error).
+A broken sink disables diagnostic output without recursive error logging.
+Closing the writer waits at most one second. This is not lossless auditing:
+forced termination, broken stderr, and saturation can lose records, including
+completion and shutdown events. File capture, rotation, and retention belong
+to the operator, not this server.
+
+Startup emits `server.start` at info. SIGINT, SIGTERM, stdin EOF, and transport
+closure share an idempotent shutdown path: `server.stop` at info, then at most
+one second of diagnostic flushing. Repeated signals do not duplicate the stop
+event. A broken stderr cannot prevent exit; forced termination can lose all
+pending records. Unexpected process failures emit
+`server.fatal` at error with a fixed safe code rather than an exception or
+stack. Stderr is no longer normally empty. Stdout remains reserved for MCP
+messages, including requested results. YouTube.js logging stays disabled.
+Each validated tool execution emits one `request.end` with a generated
+`request_id`, tool name, limit, result, and monotonic `duration_ms`. Success
+is info with returned count; errors, timeouts, and cancellations are warn with
+safe codes. Timeout/cancellation summaries retain the active stage snapshot;
+normal cleanup aborts are not cancellations, and late work cannot publish a
+second completion. Ordinary tool failures keep their existing MCP codes.
+
+Timing starts after SDK input validation and ends when the operation's result
+or safe failure is decided. It excludes MCP serialization/transmission, client
+round-trip, process startup, discovery, and rejected inputs. Measure those
+externally rather than interpreting server duration as end-to-end latency.
+Domain-stage instrumentation is connected separately.
+
+The opt-in check's summary is test evidence, not a production audit trail.
+Durable storage and retention are not provided. Do not enable upstream verbose
+logging as a substitute: it can expose session material.
+
+## Verification boundary
+
+Local integration covers stdio through HTTP/WebSocket CDP and upstream
+fixtures, including cancellation, timeout, account changes, and secret-safe
+failures. This is not proof that a personal account's current YouTube response
+matches those fixtures. Unsupported structures fail closed.
+
+HTTP deployment, Nix application packaging, and all writes are separate
+changes. Live read-only testing requires explicit approval and is not part
+of the default suite.

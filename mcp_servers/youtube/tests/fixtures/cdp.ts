@@ -18,6 +18,7 @@ export function cdpFixture(
     redirect?: boolean;
     noPage?: boolean;
     stall?: boolean;
+    delayMs?: number;
     closeEarly?: boolean;
     malformed?: boolean;
   } = {},
@@ -53,11 +54,13 @@ export function cdpFixture(
       close(ws) {
         sockets.delete(ws);
       },
-      message(ws, raw) {
+      async message(ws, raw) {
         const msg = JSON.parse(String(raw));
         commands.push(msg);
         if (options.closeEarly) return ws.close();
         if (options.stall) return;
+        if (options.delayMs) await Bun.sleep(options.delayMs);
+        if (ws.readyState !== 1) return;
         const results: Record<string, unknown> = {
           "Target.getBrowserContexts": { browserContextIds: ["incognito"] },
           "Target.getTargets": {

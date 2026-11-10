@@ -1,5 +1,21 @@
 import { SafeError } from "./errors.ts";
 
+export type LogLevel = "error" | "warn" | "info" | "debug";
+
+export function readLogLevel(
+  env: Record<string, string | undefined> = process.env,
+): LogLevel {
+  const level = env.YOUTUBE_LOG_LEVEL ?? "info";
+  if (
+    level === "error" ||
+    level === "warn" ||
+    level === "info" ||
+    level === "debug"
+  )
+    return level;
+  throw new Error("Invalid log level.");
+}
+
 export function readConfig(
   env: Record<string, string | undefined> = process.env,
 ) {

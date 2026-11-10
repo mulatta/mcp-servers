@@ -1,0 +1,141 @@
+{
+  "contents": {
+    "twoColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "selected": true,
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "itemSectionRenderer": {
+                      "contents": [
+                        {
+                          "videoRenderer": {
+                            "videoId": "v0000000000",
+                            "title": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            },
+                            "shortBylineText": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "videoRenderer": {
+                            "videoId": "v0000000001",
+                            "title": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            },
+                            "shortBylineText": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "videoRenderer": {
+                            "videoId": "v0000000002",
+                            "title": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            },
+                            "shortBylineText": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "videoRenderer": {
+                            "videoId": "v0000000003",
+                            "title": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            },
+                            "shortBylineText": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "videoRenderer": {
+                            "videoId": "v0000000004",
+                            "title": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            },
+                            "shortBylineText": {
+                              "runs": [
+                                {
+                                  "text": "Fixture"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ],
+                      "header": {
+                        "itemSectionHeaderRenderer": {
+                          "title": {
+                            "runs": [
+                              {
+                                "text": "Fixture"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "continuationItemRenderer": {
+                      "trigger": "CONTINUATION_TRIGGER_ON_ITEM_SHOWN",
+                      "continuationEndpoint": {
+                        "continuationCommand": {
+                          "token": "fixture-next"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

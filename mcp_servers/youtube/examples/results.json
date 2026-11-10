@@ -1,0 +1,60 @@
+{
+  "youtube_list_playlists": {
+    "account_id": "UCaaaaaaaaaaaaaaaaaaaaaa",
+    "items": [
+      { "playlist_id": "PLfixture", "title": "Fixture", "video_count": null }
+    ],
+    "next_cursor": null,
+    "has_more": false
+  },
+  "youtube_get_playlist": {
+    "account_id": "UCaaaaaaaaaaaaaaaaaaaaaa",
+    "items": [
+      {
+        "video_id": null,
+        "title": "[Private video]",
+        "url": null,
+        "channel_name": null,
+        "availability": "private"
+      }
+    ],
+    "next_cursor": null,
+    "has_more": false
+  },
+  "youtube_get_watch_later": {
+    "account_id": "UCaaaaaaaaaaaaaaaaaaaaaa",
+    "items": [],
+    "next_cursor": null,
+    "has_more": false
+  },
+  "youtube_get_liked_videos": {
+    "account_id": "UCaaaaaaaaaaaaaaaaaaaaaa",
+    "items": [
+      {
+        "video_id": "v0000000001",
+        "title": "Fixture",
+        "url": "https://www.youtube.com/watch?v=v0000000001",
+        "channel_name": null,
+        "availability": "available"
+      }
+    ],
+    "next_cursor": null,
+    "has_more": false
+  },
+  "youtube_get_watch_history": {
+    "account_id": "UCaaaaaaaaaaaaaaaaaaaaaa",
+    "items": [
+      {
+        "video_id": "v0000000001",
+        "title": "Fixture",
+        "url": "https://www.youtube.com/watch?v=v0000000001",
+        "channel_name": null,
+        "availability": "available",
+        "watched_at": null,
+        "group_label": "Today"
+      }
+    ],
+    "next_cursor": null,
+    "has_more": false
+  }
+}
