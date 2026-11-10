@@ -27,6 +27,7 @@ export const writeToolGroups = {
   youtube_remove_rating: "rating",
   youtube_subscribe: "subscription",
   youtube_unsubscribe: "subscription",
+  youtube_set_channel_notifications: "notification",
 } as const satisfies Record<string, WriteGroup>;
 export type WriteToolName = keyof typeof writeToolGroups;
 export const writeToolNames = Object.keys(writeToolGroups) as WriteToolName[];

@@ -19,7 +19,9 @@
                                   {
                                     "channelRenderer": {
                                       "channelId": "UCfixture000000000000001",
-                                      "title": { "simpleText": "Fixture" },
+                                      "title": {
+                                        "simpleText": "Fixture"
+                                      },
                                       "subscriberCountText": {
                                         "simpleText": "@fixture1"
                                       },
@@ -66,7 +68,75 @@
                                                     }
                                                   }
                                                 }
-                                              ]
+                                              ],
+                                              "command": {
+                                                "commandExecutorCommand": {
+                                                  "commands": [
+                                                    {
+                                                      "openPopupAction": {
+                                                        "popupType": "DROPDOWN",
+                                                        "popup": {
+                                                          "menuPopupRenderer": {
+                                                            "items": [
+                                                              {
+                                                                "menuServiceItemRenderer": {
+                                                                  "icon": {
+                                                                    "iconType": "NOTIFICATIONS_ACTIVE"
+                                                                  },
+                                                                  "isSelected": true,
+                                                                  "serviceEndpoint": {
+                                                                    "modifyChannelNotificationPreferenceEndpoint": {
+                                                                      "params": "fixture-all-1"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              },
+                                                              {
+                                                                "menuServiceItemRenderer": {
+                                                                  "icon": {
+                                                                    "iconType": "NOTIFICATIONS_NONE"
+                                                                  },
+                                                                  "isSelected": false,
+                                                                  "serviceEndpoint": {
+                                                                    "modifyChannelNotificationPreferenceEndpoint": {
+                                                                      "params": "fixture-personalized-1"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              },
+                                                              {
+                                                                "menuServiceItemRenderer": {
+                                                                  "icon": {
+                                                                    "iconType": "NOTIFICATIONS_OFF"
+                                                                  },
+                                                                  "isSelected": false,
+                                                                  "serviceEndpoint": {
+                                                                    "modifyChannelNotificationPreferenceEndpoint": {
+                                                                      "params": "fixture-none-1"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              },
+                                                              {
+                                                                "menuServiceItemRenderer": {
+                                                                  "icon": {
+                                                                    "iconType": "PERSON_MINUS"
+                                                                  },
+                                                                  "serviceEndpoint": {
+                                                                    "signalServiceEndpoint": {
+                                                                      "signal": "CLIENT_SIGNAL"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            ]
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  ]
+                                                }
+                                              }
                                             }
                                           }
                                         }
@@ -76,7 +146,9 @@
                                   {
                                     "channelRenderer": {
                                       "channelId": "UCfixture000000000000002",
-                                      "title": { "simpleText": "Fixture" },
+                                      "title": {
+                                        "simpleText": "Fixture"
+                                      },
                                       "subscriberCountText": {
                                         "simpleText": "@fixture2"
                                       },
@@ -123,7 +195,75 @@
                                                     }
                                                   }
                                                 }
-                                              ]
+                                              ],
+                                              "command": {
+                                                "commandExecutorCommand": {
+                                                  "commands": [
+                                                    {
+                                                      "openPopupAction": {
+                                                        "popupType": "DROPDOWN",
+                                                        "popup": {
+                                                          "menuPopupRenderer": {
+                                                            "items": [
+                                                              {
+                                                                "menuServiceItemRenderer": {
+                                                                  "icon": {
+                                                                    "iconType": "NOTIFICATIONS_ACTIVE"
+                                                                  },
+                                                                  "isSelected": false,
+                                                                  "serviceEndpoint": {
+                                                                    "modifyChannelNotificationPreferenceEndpoint": {
+                                                                      "params": "fixture-all-2"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              },
+                                                              {
+                                                                "menuServiceItemRenderer": {
+                                                                  "icon": {
+                                                                    "iconType": "NOTIFICATIONS_NONE"
+                                                                  },
+                                                                  "isSelected": false,
+                                                                  "serviceEndpoint": {
+                                                                    "modifyChannelNotificationPreferenceEndpoint": {
+                                                                      "params": "fixture-personalized-2"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              },
+                                                              {
+                                                                "menuServiceItemRenderer": {
+                                                                  "icon": {
+                                                                    "iconType": "NOTIFICATIONS_OFF"
+                                                                  },
+                                                                  "isSelected": true,
+                                                                  "serviceEndpoint": {
+                                                                    "modifyChannelNotificationPreferenceEndpoint": {
+                                                                      "params": "fixture-none-2"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              },
+                                                              {
+                                                                "menuServiceItemRenderer": {
+                                                                  "icon": {
+                                                                    "iconType": "PERSON_MINUS"
+                                                                  },
+                                                                  "serviceEndpoint": {
+                                                                    "signalServiceEndpoint": {
+                                                                      "signal": "CLIENT_SIGNAL"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            ]
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  ]
+                                                }
+                                              }
                                             }
                                           }
                                         }

@@ -58,6 +58,15 @@ was accessed for this inspection.
   to `subscription/unsubscribe`, the values `InteractionManager` uses. Both
   answer with `actions[].updateSubscribeButtonAction` (`channelId`,
   `subscribed`), which the tools require to match the request.
+- `InteractionManager.setNotificationPreferences()` encodes its own
+  `NotificationPreferences` protobuf. Instead, the bell tool reads the
+  channel's FEchannels bell dropdown, whose `menuServiceItemRenderer` items
+  pair an icon (`NOTIFICATIONS_ACTIVE`, `NOTIFICATIONS_NONE`,
+  `NOTIFICATIONS_OFF`) with `modifyChannelNotificationPreferenceEndpoint`
+  params, and posts the params of the wanted item to
+  `notification/modify_channel_preference`. The answer carries a
+  `subscriptionNotificationStateEntity.state`: `…_ALL`, `…_OCCASIONAL` for
+  personalized, or `…_OFF`.
 - `account.getInfo(true)` lists accounts using WEB and has `is_selected`, but
   `AccountItem` does not expose a stable channel ID as a dedicated field. Do not
   execute switch-account service endpoints to derive identity.

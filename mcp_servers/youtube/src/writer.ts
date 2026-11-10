@@ -114,6 +114,37 @@ const operations: Record<WriteToolName, Operation> = {
     "CgIIAhgA",
     false,
   ),
+  // Unlike YouTube.js setNotificationPreferences(), which encodes its own
+  // protobuf params, the params come from the channel's own bell dropdown.
+  youtube_set_channel_notifications: {
+    routes: ["channel_notifications"],
+    path: "/notification/modify_channel_preference",
+    prepare: (client, input, signal) =>
+      bellParams(
+        client,
+        input.channel_id as string,
+        input.setting as Bell,
+        signal,
+      ),
+    body: (_input, prepared) => ({ params: prepared.params }),
+    result: (data, input) => {
+      const updates = (data.frameworkUpdates ?? {}) as Record<string, unknown>;
+      const batch = (updates.entityBatchUpdate ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const mutations = Array.isArray(batch.mutations) ? batch.mutations : [];
+      const confirmed = mutations.some((mutation) => {
+        const payload = (mutation as { payload?: Record<string, unknown> })
+          .payload;
+        const entity = payload?.subscriptionNotificationStateEntity as
+          Record<string, unknown> | undefined;
+        return entity?.state === bellStates[input.setting as Bell];
+      });
+      if (!confirmed) throw new SafeError("WRITE_OUTCOME_UNKNOWN");
+      return { channel_id: input.channel_id, notification: input.setting };
+    },
+  },
   // YouTube.js 18.3.0 setName() sends `playlist_id` instead of `playlistId`,
   // so the edit body is built here for both fields.
   youtube_update_playlist: {
@@ -227,6 +258,100 @@ function subscription(
       return { channel_id: input.channel_id, subscribed };
     },
   };
+}
+
+const bellIcons = {
+  all: "NOTIFICATIONS_ACTIVE",
+  personalized: "NOTIFICATIONS_NONE",
+  none: "NOTIFICATIONS_OFF",
+} as const;
+const bellStates = {
+  all: "SUBSCRIPTION_NOTIFICATION_STATE_ALL",
+  personalized: "SUBSCRIPTION_NOTIFICATION_STATE_OCCASIONAL",
+  none: "SUBSCRIPTION_NOTIFICATION_STATE_OFF",
+} as const;
+type Bell = keyof typeof bellIcons;
+// YouTube caps subscriptions at 2,000; this covers them with room to spare.
+const subscriptionPages = 30;
+
+/**
+ * Reads the subscription list for the channel's bell dropdown and returns the
+ * params YouTube itself offers for the wanted setting, so nothing is encoded here.
+ */
+async function bellParams(
+  client: YoutubeClient,
+  channel: string,
+  bell: Bell,
+  signal: AbortSignal,
+): Promise<Record<string, unknown>> {
+  let continuation: string | null = null;
+  for (let page = 0; page < subscriptionPages; page++) {
+    const token: string | null = continuation;
+    const response: { data: unknown } = await client.use(signal, (yt) =>
+      yt.actions.execute(
+        "/browse",
+        token
+          ? { continuation: token, parse: false }
+          : { browseId: "FEchannels", parse: false },
+      ),
+    );
+    const renderer = findChannel(response.data, channel);
+    if (renderer) {
+      const params = menuParams(renderer, bellIcons[bell]);
+      if (!params) throw new SafeError("UPSTREAM_CHANGED");
+      return { params };
+    }
+    continuation = normalize(response.data, "channels", {
+      continuation: !!token,
+    }).continuation;
+    if (!continuation) throw new SafeError("CHANNEL_NOT_SUBSCRIBED");
+  }
+  throw new SafeError("UPSTREAM_CHANGED");
+}
+
+function findChannel(
+  value: unknown,
+  channel: string,
+  depth = 0,
+): Record<string, unknown> | undefined {
+  if (depth > 32 || typeof value !== "object" || value === null) return;
+  const renderer = (value as Record<string, unknown>).channelRenderer as
+    Record<string, unknown> | undefined;
+  if (renderer?.channelId === channel) return renderer;
+  for (const child of Object.values(value)) {
+    const found = findChannel(child, channel, depth + 1);
+    if (found) return found;
+  }
+}
+
+// Exactly one dropdown item may carry the wanted icon and an endpoint.
+function menuParams(renderer: unknown, icon: string): string | undefined {
+  const found: string[] = [];
+  const visit = (value: unknown, depth: number) => {
+    if (depth > 40 || typeof value !== "object" || value === null) return;
+    for (const [key, child] of Object.entries(value)) {
+      if (key === "menuServiceItemRenderer") {
+        const item = child as {
+          icon?: { iconType?: unknown };
+          serviceEndpoint?: {
+            modifyChannelNotificationPreferenceEndpoint?: { params?: unknown };
+          };
+        };
+        const params =
+          item.serviceEndpoint?.modifyChannelNotificationPreferenceEndpoint
+            ?.params;
+        if (
+          item.icon?.iconType === icon &&
+          typeof params === "string" &&
+          params
+        )
+          found.push(params);
+      }
+      visit(child, depth + 1);
+    }
+  };
+  visit(renderer, 0);
+  return found.length === 1 ? found[0] : undefined;
 }
 
 function succeeded(data: Record<string, unknown>) {

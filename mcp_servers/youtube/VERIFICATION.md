@@ -1,5 +1,15 @@
 # Verification record
 
+## Approved live notification bell check: 2026-11-10
+
+With `YOUTUBE_WRITES=notification`, one subscribed channel whose bell was
+`personalized` was set to `all`, then `none`, then back to `personalized`.
+Each write was confirmed by YouTube's returned notification state and showed
+in `youtube_list_subscriptions` after about 5.7–5.8 s; the final setting
+matched the original. A channel the account does not follow was refused with
+`CHANNEL_NOT_SUBSCRIBED` before any write. An earlier key-only probe that
+found the bell dropdown params also restored the setting it changed.
+
 ## Approved live subscription check: 2026-11-10
 
 With `YOUTUBE_WRITES=subscription`, a channel absent from the account's 357

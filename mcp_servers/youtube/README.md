@@ -126,6 +126,7 @@ flakelet module exposes the same list as `writes`.
 | `rating` | `youtube_remove_rating` | `video_id` | Yes |
 | `subscription` | `youtube_subscribe` | `channel_id` (`UC…`) | No |
 | `subscription` | `youtube_unsubscribe` | `channel_id` (`UC…`) | Yes |
+| `notification` | `youtube_set_channel_notifications` | `channel_id` (`UC…`), `setting` (`all`, `personalized`, `none`) | No |
 
 Write tools declare `readOnlyHint: false` and `idempotentHint: false`; deletes
 also declare `destructiveHint: true`. A write is sent once and never retried.
@@ -143,6 +144,10 @@ the very top is not supported. A rating counts as done only when YouTube
 returns the video's new like status (`LIKE`, or `INDIFFERENT` after removal);
 there is no dislike tool. A subscription change counts as done only when
 YouTube's subscribe-button update names the channel with the requested state.
+A bell change first finds the channel in the subscription list (refusing with
+`CHANNEL_NOT_SUBSCRIBED` before any write) and posts the params YouTube offers
+in that channel's bell menu; it counts as done only when YouTube returns the
+matching notification state.
 
 Example MCP call arguments:
 

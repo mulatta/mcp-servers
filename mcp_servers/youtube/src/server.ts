@@ -244,4 +244,13 @@ const writeTools: Record<
     input: { channel_id: channelId },
     destructive: true,
   },
+  youtube_set_channel_notifications: {
+    description:
+      "Set a subscribed channel's notification bell to all, personalized or none.",
+    input: {
+      channel_id: channelId,
+      setting: z.enum(["all", "personalized", "none"]),
+    },
+    destructive: false,
+  },
 };

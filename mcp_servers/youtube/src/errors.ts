@@ -10,6 +10,7 @@ const messages = {
   PLAYLIST_ITEM_NOT_FOUND: "A requested video is not in this playlist.",
   PLAYLIST_ITEM_AMBIGUOUS:
     "A requested video appears more than once in this playlist.",
+  CHANNEL_NOT_SUBSCRIBED: "This account is not subscribed to the channel.",
   PLAYLIST_TOO_LONG:
     "The playlist is too long to locate its entries; nothing was changed.",
   RATE_LIMITED: "YouTube rate limited this request. Try again later.",

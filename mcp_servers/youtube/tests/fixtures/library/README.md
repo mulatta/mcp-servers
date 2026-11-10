@@ -21,7 +21,10 @@ playlist-content fixtures with the requested browse ID asserted at the HTTP
 boundary; these are not claimed to be captures of those private lists.
 `channels.json` is synthetic: its FEchannels layout follows the youtubei.js
 18.3.0 `Channel`, `SubscribeButton` and `SubscriptionNotificationToggleButton`
-parsers, not a captured response. `channel-videos.json` is likewise synthetic,
+parsers, not a captured response; its bell dropdown (`menuServiceItemRenderer`
+items with `modifyChannelNotificationPreferenceEndpoint` params) follows key
+paths seen in a live FEchannels response, with synthetic values.
+`channel-videos.json` is likewise synthetic,
 shaped after the youtubei.js `RichGrid`, `Video` and `LockupView` parsers.
 Account settings fixture in `../account.ts` is synthetic and source-derived,
 not a captured response. Live account compatibility remains unverified.
