@@ -28,7 +28,7 @@ async def test_connect_existing_context(chromium: tuple[str, str], index: int) -
         originals = list(browser.contexts[0].pages)
         addresses = [page.url for page in originals]
         try:
-            async with session.acquire() as page:
+            async with session.lease() as page:
                 assert page.url == "about:blank"
                 await page.set_content("<title>Disposable MCP test</title>")
                 assert await page.title() == "Disposable MCP test"

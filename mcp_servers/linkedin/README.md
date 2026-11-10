@@ -33,9 +33,9 @@ Upstream saved-account selection and subsequent navigation back to the profile a
 
 ## Browser lifetime
 
-The MCP creates a dedicated tab in the existing context and serializes lookups. Shutdown and request cancellation release only that tab and the client connection, preserving user tabs, the browser, and its login session. Connection loss fails the in-flight request; the next explicit request reconnects. Failed requests are never replayed automatically.
+Each request leases a fresh background tab in the existing context. Lookups remain serialized, including tab cleanup. Success, failure, and cancellation all trigger cleanup of that request's tab; the healthy CDP connection is reused, not the tab. Server shutdown disconnects the client without closing user tabs, the browser, or its login session. Connection loss fails the in-flight request; the next explicit request reconnects. Failed requests are never replayed automatically.
 
-Tabs are created with CDP `Target.createTarget(background=true)` in the existing default context. The returned target ID is recorded before Page initialization, matched against Patchright Pages by CDP target identity, and used for cleanup even when initialization fails or is cancelled. There is no foreground fallback or focus-restoration call. This does not yet implement the planned request-scoped lease, deadline, or blocked-cleanup recovery policy.
+Tabs are created with CDP `Target.createTarget(background=true)` in the existing default context. The returned target ID is recorded before Page initialization, matched against Patchright Pages by CDP target identity, and used for cleanup even when initialization fails or is cancelled. There is no foreground fallback or focus-restoration call. Bounded admission, the complete operation/cleanup deadline policy, and blocked-cleanup recovery are still pending.
 
 The application does not guess ownership to remove tabs left behind after disconnection. Connection errors omit endpoint passwords and tokens and suggest checking discovery addresses and relay availability.
 
@@ -74,6 +74,8 @@ Tests never navigate existing tabs. Profile and authentication tests fulfill req
 
 Disconnect tests close only sockets belonging to a test-specific TCP relay, not Neko or an existing SSH tunnel. A separate observer cleans up only exact tab handles created by the tests. The shared browser is never terminated or forcibly logged out.
 
+Historical verification of the earlier reusable-tab implementation:
+
 Twenty-three automatic tests cover CDP lifetime, MCP initialization, tool listing, input constraints, and profile extraction, authentication, and empty-result handling with fixed DOM fixtures. They passed against Neko Chrome 154 through development-only SSH local forwarding. A user-authorized live profile lookup also succeeded over stdio: after an authwall error, the user signed in through Neko and retried successfully. Explicit transport shutdown closed the exact dedicated tab while preserving existing tabs. The verification client uses `StdioTransport(keep_alive=False)`; the default True keeps the server alive after the client connection scope exits, so tab closure must not be expected then. Direct execution on malt and production Nix packaging still require separate opt-in verification.
 
 ## Opt-in verification on malt
@@ -90,6 +92,6 @@ LINKEDIN_TEST_PROFILE=https://www.linkedin.com/in/YOUR-AUTHORIZED-PROFILE/ \
 uv run pytest mcp_servers/linkedin/tests/test_live.py -q
 ```
 
-This live test is skipped unless `LINKEDIN_TEST_PROFILE` is set. It checks the main profile, preserves existing tabs, explicitly shuts down the stdio transport, and verifies that the exact newly created tab closes. It does not force logout, solve checkpoints, or print profile content on success. To test a packaged server, set `LINKEDIN_MCP_EXECUTABLE` to its absolute executable path.
+This live test is skipped unless `LINKEDIN_TEST_PROFILE` is set. It checks the main profile, verifies that the exact newly created tab closes before transport shutdown, preserves existing tabs, and then explicitly shuts down the stdio transport. It does not force logout, solve checkpoints, or print profile content on success. To test a packaged server, set `LINKEDIN_MCP_EXECUTABLE` to its absolute executable path.
 
 If LinkedIn asks for authentication, complete it manually in Neko and rerun the command. Record a saved-account chooser separately if one appears naturally; do not sign out or alter cookies to force that state. Development-only SSH forwarding is not evidence that the MCP has run directly on malt.
