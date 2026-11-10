@@ -1,5 +1,16 @@
 # Verification record
 
+## Approved live playlist edit check: 2026-11-10
+
+With `YOUTUBE_WRITES=playlist`, two public uploads from a subscribed channel
+that were not in Watch Later were used. In a new private playlist, adding both
+was visible after about 2.4 s, removing one left exactly the other after about
+2.4 s, and the playlist was deleted. In Watch Later (2,177 entries), adding one
+of them was visible after about 12.5 s and removing it again took about 16.4 s
+to show; afterwards Watch Later had the same entries in the same order as
+before. Every write returned success; only flags, counts and timings were
+printed.
+
 ## Approved live paging check: 2026-11-10
 
 Reading Watch Later past its first page failed with `UPSTREAM_CHANGED`; a
