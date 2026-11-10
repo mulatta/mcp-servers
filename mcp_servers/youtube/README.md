@@ -150,8 +150,9 @@ responses carry identical JSON in `structuredContent` and the text block:
 Unknown values are `null`, never guessed from display text. Explicit private
 or deleted entries stay in the list. YouTube may hide unavailable items; this
 server cannot recover them. An unsupported response is an error, not an empty
-success. An unknown or removed channel ID has no verified response shape and
-fails as an upstream error.
+success. An unknown channel ID returns `CHANNEL_UNAVAILABLE`; a channel
+without a Videos tab (no regular uploads, for example only Shorts) reads as an
+empty list.
 
 ### Pagination
 
@@ -272,6 +273,7 @@ sent).
 | `PLAYLIST_ITEM_NOT_FOUND` | A video to move is not in the playlist. Nothing was sent. |
 | `PLAYLIST_ITEM_AMBIGUOUS` | A video to move is listed twice. Nothing was sent. |
 | `PLAYLIST_TOO_LONG` | The playlist exceeds 60 pages for a move. Nothing was sent. |
+| `CHANNEL_UNAVAILABLE` | The channel does not exist or is unavailable. |
 | `CHANNEL_NOT_SUBSCRIBED` | A bell change for a channel the account does not follow. Nothing was sent. |
 | `RATE_LIMITED` | YouTube rate limited the request. Wait. |
 | `UPSTREAM_BLOCKED` | YouTube asked for a bot check. Stop and check the browser. |
@@ -338,7 +340,7 @@ All 18 tools were checked live on one account on 2026-11-10 and 2026-11-11.
 
 | Area | Checked live | Not checked live |
 | --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| reads | five items per tool; full paging of Watch Later, playlists, subscriptions; new fields populated | accounts with no subscriptions, channels with no uploads, unknown channel IDs |
+| reads | five items per tool; full paging of Watch Later, playlists, subscriptions; new fields populated; unknown and upload-less channels | accounts with no subscriptions |
 | playlists | create (private; unlisted with description), delete, add/remove 1–50 videos, rename, move in a playlist and in Watch Later, not-found and duplicate refusals | public privacy, reading back privacy or description, `PLAYLIST_TOO_LONG` |
 | ratings | like and removal on a video that was not liked | removing a dislike |
 | subscriptions | subscribe and unsubscribe a channel that was not followed | — |

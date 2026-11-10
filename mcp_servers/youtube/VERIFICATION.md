@@ -16,7 +16,7 @@ the account ended as it started. Entries are newest first.
 | `youtube_get_liked_videos` | five items; 30 pages | browse reads, paging |
 | `youtube_get_watch_history` | five items; four pages, durations on regular videos | browse reads, durations |
 | `youtube_list_subscriptions` | five items; all pages; `all`/`none`/`personalized` bells | browse reads, paging, bells |
-| `youtube_get_channel_videos` | five items; upload labels, durations | browse reads, durations |
+| `youtube_get_channel_videos` | five items; upload labels, durations; unknown and upload-less channels | browse reads, durations, channel edge cases |
 | `youtube_create_playlist` | private; unlisted with description over HTTP | create/delete, HTTP writes |
 | `youtube_delete_playlist` | removed from the list within 0.5 s | create/delete |
 | `youtube_add_to_playlist` | 2 and 50 videos; Watch Later; a duplicate | playlist edits, HTTP writes |
@@ -32,8 +32,18 @@ the account ended as it started. Entries are newest first.
 Not checked live: public playlist privacy, reading back privacy or a
 description (no read tool returns them), `PLAYLIST_TOO_LONG`, removing a
 dislike, live timeouts, 5xx or refusals on writes, accounts without
-subscriptions, channels without uploads, unknown channel IDs, a reverse proxy
+subscriptions, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
+
+## Approved live channel edge-case check: 2026-11-11
+
+Key-only probes showed that a made-up `UC` ID answers HTTP 200 with an `ERROR`
+alert "This channel does not exist.", and that the account's own channel,
+which has no uploads, has no Videos tab: YouTube selected its Playlists tab,
+whose endpoint params differ from the Videos tab's. After the fix,
+`youtube_get_channel_videos` returned `CHANNEL_UNAVAILABLE` for two made-up
+IDs, an empty list with no further page for the account's own channel, and
+five items with more pages for a followed channel.
 
 ## Approved live HTTP write check: 2026-11-11
 

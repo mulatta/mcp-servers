@@ -62,6 +62,14 @@ export async function checkResponse(response: Response): Promise<void> {
       )
     )
       throw new SafeError("PLAYLIST_UNAVAILABLE");
+    if (
+      messages.some(
+        (m) =>
+          typeof m === "string" &&
+          /channel.*(not exist|unavailable|terminated)/i.test(m),
+      )
+    )
+      throw new SafeError("CHANNEL_UNAVAILABLE");
     throw new SafeError("UPSTREAM_CHANGED");
   }
   if (!response.ok) throw new SafeError("UPSTREAM_UNAVAILABLE");

@@ -138,3 +138,107 @@ test("a channel cursor cannot continue another channel", async () => {
     await c.close();
   }
 });
+
+// Observed live on a channel without uploads: there is no Videos tab, and
+// YouTube selects another tab whose endpoint carries different params.
+test("a channel without a Videos tab has no uploads", () => {
+  const copy = structuredClone(channelVideos) as {
+    contents: {
+      twoColumnBrowseResultsRenderer: {
+        tabs: { tabRenderer: Record<string, unknown> }[];
+      };
+    };
+  };
+  const tabs = copy.contents.twoColumnBrowseResultsRenderer.tabs;
+  tabs[0]!.tabRenderer.selected = true;
+  tabs[0]!.tabRenderer.title = "Playlists";
+  tabs[0]!.tabRenderer.content = {
+    sectionListRenderer: {
+      contents: [
+        {
+          itemSectionRenderer: {
+            contents: [
+              {
+                gridRenderer: {
+                  items: [
+                    {
+                      lockupViewModel: {
+                        contentId: "PLfixture0001",
+                        contentType: "LOCKUP_CONTENT_TYPE_PLAYLIST",
+                        metadata: {
+                          lockupMetadataViewModel: {
+                            title: { content: "Fixture" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  };
+  tabs.splice(1, 1);
+  expect(normalize(copy, "channel_videos")).toEqual({
+    items: [],
+    continuation: null,
+  });
+});
+
+test("a selected channel tab without an endpoint cannot be identified", () => {
+  const copy = structuredClone(channelVideos) as {
+    contents: {
+      twoColumnBrowseResultsRenderer: {
+        tabs: { tabRenderer: Record<string, unknown> }[];
+      };
+    };
+  };
+  delete copy.contents.twoColumnBrowseResultsRenderer.tabs[1]!.tabRenderer
+    .endpoint;
+  expect(() => normalize(copy, "channel_videos")).toThrow();
+});
+
+// Observed live for made-up channel IDs: HTTP 200 with an ERROR alert and no contents.
+test("an unknown channel ID reports CHANNEL_UNAVAILABLE", async () => {
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch(req) {
+      const body = await req.json();
+      return Response.json(
+        body.browseId === "SPaccount_advanced"
+          ? accountPage("UCaaaaaaaaaaaaaaaaaaaaaa")
+          : {
+              alerts: [
+                {
+                  alertRenderer: {
+                    type: "ERROR",
+                    text: { simpleText: "This channel does not exist." },
+                  },
+                },
+              ],
+            },
+      );
+    },
+  });
+  const signal = new AbortController().signal;
+  try {
+    const session = await YoutubeClient.connect(
+      "SAPISID=fixture",
+      signal,
+      (req) => fetch(new Request(`http://127.0.0.1:${server.port}/`, req)),
+    );
+    await expect(
+      session.value.page(
+        "youtube_get_channel_videos",
+        { limit: 5, channel_id: channel },
+        signal,
+      ),
+    ).rejects.toMatchObject({ code: "CHANNEL_UNAVAILABLE" });
+  } finally {
+    server.stop(true);
+  }
+});

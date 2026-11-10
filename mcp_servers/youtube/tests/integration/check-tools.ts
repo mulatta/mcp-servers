@@ -1,24 +1,10 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { toolNames, type ToolName } from "../../src/server.ts";
 import { resultSchema } from "../../src/youtube/normalize.ts";
-import { SafeError, safeError } from "../../src/errors.ts";
+import { SafeError, isErrorCode, safeError } from "../../src/errors.ts";
 import { z } from "zod";
 
-const failureSchema = z.object({
-  code: z.enum([
-    "BROWSER_UNAVAILABLE",
-    "AUTH_REQUIRED",
-    "ACCOUNT_CHANGED",
-    "CURSOR_INVALID",
-    "CURSOR_EXPIRED",
-    "PLAYLIST_UNAVAILABLE",
-    "RATE_LIMITED",
-    "UPSTREAM_BLOCKED",
-    "UPSTREAM_CHANGED",
-    "UPSTREAM_UNAVAILABLE",
-    "TIMEOUT",
-  ]),
-});
+const failureSchema = z.object({ code: z.string().refine(isErrorCode) });
 export type CheckReport = {
   tool: ToolName;
   requested: number;
@@ -64,7 +50,8 @@ export async function checkTools(client: Client): Promise<CheckReport[]> {
               continue;
             }
             const failure = failureSchema.safeParse(parsed);
-            if (failure.success) throw new SafeError(failure.data.code);
+            if (failure.success && isErrorCode(failure.data.code))
+              throw new SafeError(failure.data.code);
           }
         throw new SafeError("UPSTREAM_UNAVAILABLE");
       }

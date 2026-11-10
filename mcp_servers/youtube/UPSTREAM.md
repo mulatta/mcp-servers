@@ -60,7 +60,11 @@ YouTube.js changes these files; until then no write goes through a
   `getVideos()`, which first loads the channel home and follows its tab
   endpoint. The tab content is a `richGridRenderer` of `videoRenderer` or video
   `lockupViewModel` items; on this tab lockup metadata rows carry views and the
-  upload label, not the channel name.
+  upload label, not the channel name. Live, a channel without uploads had no
+  Videos tab; YouTube selected its Playlists tab instead, whose endpoint params
+  differ, so a selected tab with other params reads as no uploads. A made-up
+  `UC` ID answered HTTP 200 with an `ERROR` alert "This channel does not
+  exist." and no contents.
 - Playlist continuations now repeat an empty tab shell in `contents` beside
   `onResponseReceivedActions`; continuation reads use only the appended items.
 - A playlist with no videos shows a `messageRenderer` reading "No videos in

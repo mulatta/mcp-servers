@@ -43,6 +43,9 @@ export type Result = z.infer<typeof resultSchema>;
 export type Kind =
   "videos" | "playlists" | "history" | "channels" | "channel_videos";
 
+// Browse params selecting a channel's Videos tab, newest first.
+export const channelVideosParams = "EgZ2aWRlb3PyBgQKAjoA";
+
 export function resultEnvelope(
   accountId: string,
   items: Item[],
@@ -274,6 +277,18 @@ export function normalize(
         .map((t) => object(object(t).tabRenderer))
         .filter((t) => t.selected === true);
       if (selected.length !== 1) throw new SafeError("UPSTREAM_CHANGED");
+      if (kind === "channel_videos") {
+        // A channel without uploads has no Videos tab; YouTube then selects
+        // another tab, recognisable by different params on its endpoint.
+        const params = object(
+          object(selected[0]!.endpoint).browseEndpoint,
+        ).params;
+        if (typeof params !== "string") throw new SafeError("UPSTREAM_CHANGED");
+        if (params !== channelVideosParams) {
+          recognized = true;
+          return;
+        }
+      }
       return walk(selected[0]!.content, group);
     }
     for (const key of [

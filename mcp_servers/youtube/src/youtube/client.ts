@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Innertube, Log, YTNodes } from "youtubei.js";
 import { SafeError } from "../errors.ts";
-import { normalize, type Page } from "./normalize.ts";
+import { channelVideosParams, normalize, type Page } from "./normalize.ts";
 import { checkResponse } from "./response.ts";
 import { stage } from "../observability/trace.ts";
 import type { ToolName, ReadInput } from "../server.ts";
@@ -150,7 +150,7 @@ export class YoutubeClient {
     // Selects the Videos tab, newest first, without first loading the channel home.
     const params =
       name === "youtube_get_channel_videos"
-        ? { params: "EgZ2aWRlb3PyBgQKAjoA" }
+        ? { params: channelVideosParams }
         : {};
     return this.use(signal, async (client) => {
       const response = await stage("upstream.request", () =>

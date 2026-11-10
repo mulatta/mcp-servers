@@ -2,7 +2,18 @@
   "contents": {
     "twoColumnBrowseResultsRenderer": {
       "tabs": [
-        { "tabRenderer": { "title": "Home", "selected": false } },
+        {
+          "tabRenderer": {
+            "title": "Home",
+            "selected": false,
+            "endpoint": {
+              "browseEndpoint": {
+                "browseId": "UCfixture000000000000001",
+                "params": "EgdmZWF0dXJlZPIGBAoCMgA%3D"
+              }
+            }
+          }
+        },
         {
           "tabRenderer": {
             "title": "Videos",
@@ -15,8 +26,16 @@
                       "content": {
                         "videoRenderer": {
                           "videoId": "v0000000011",
-                          "title": { "runs": [{ "text": "Fixture" }] },
-                          "publishedTimeText": { "simpleText": "2 days ago" },
+                          "title": {
+                            "runs": [
+                              {
+                                "text": "Fixture"
+                              }
+                            ]
+                          },
+                          "publishedTimeText": {
+                            "simpleText": "2 days ago"
+                          },
                           "thumbnailOverlays": [
                             {
                               "thumbnailOverlayResumePlaybackRenderer": {
@@ -36,14 +55,24 @@
                           "contentType": "LOCKUP_CONTENT_TYPE_VIDEO",
                           "metadata": {
                             "lockupMetadataViewModel": {
-                              "title": { "content": "Fixture" },
+                              "title": {
+                                "content": "Fixture"
+                              },
                               "metadata": {
                                 "contentMetadataViewModel": {
                                   "metadataRows": [
                                     {
                                       "metadataParts": [
-                                        { "text": { "content": "1.2K views" } },
-                                        { "text": { "content": "3 weeks ago" } }
+                                        {
+                                          "text": {
+                                            "content": "1.2K views"
+                                          }
+                                        },
+                                        {
+                                          "text": {
+                                            "content": "3 weeks ago"
+                                          }
+                                        }
                                       ]
                                     }
                                   ]
@@ -66,6 +95,12 @@
                     }
                   }
                 ]
+              }
+            },
+            "endpoint": {
+              "browseEndpoint": {
+                "browseId": "UCfixture000000000000001",
+                "params": "EgZ2aWRlb3PyBgQKAjoA"
               }
             }
           }

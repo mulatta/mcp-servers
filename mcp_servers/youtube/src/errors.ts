@@ -7,6 +7,7 @@ const messages = {
   CURSOR_INVALID: "Cursor does not match this request.",
   CURSOR_EXPIRED: "Cursor expired. Start again without a cursor.",
   PLAYLIST_UNAVAILABLE: "Playlist is unavailable to this account.",
+  CHANNEL_UNAVAILABLE: "Channel does not exist or is unavailable.",
   PLAYLIST_ITEM_NOT_FOUND: "A requested video is not in this playlist.",
   PLAYLIST_ITEM_AMBIGUOUS:
     "A requested video appears more than once in this playlist.",
