@@ -9,7 +9,29 @@ import type { ToolName, ReadInput } from "../server.ts";
 Log.setLevel(Log.Level.NONE);
 
 export type Network = (request: Request) => Promise<Response>;
-const activeSignal = new AsyncLocalStorage<AbortSignal>();
+
+// Every authenticated request must name its route; nothing else leaves with cookies.
+const routes = {
+  browse: "/youtubei/v1/browse",
+  edit_playlist: "/youtubei/v1/browse/edit_playlist",
+  create_playlist: "/youtubei/v1/playlist/create",
+  delete_playlist: "/youtubei/v1/playlist/delete",
+  like: "/youtubei/v1/like/like",
+  remove_like: "/youtubei/v1/like/removelike",
+  subscribe: "/youtubei/v1/subscription/subscribe",
+  unsubscribe: "/youtubei/v1/subscription/unsubscribe",
+  channel_notifications: "/youtubei/v1/notification/modify_channel_preference",
+} as const;
+export type Route = keyof typeof routes;
+
+const active = new AsyncLocalStorage<{
+  signal: AbortSignal;
+  paths: ReadonlySet<string>;
+}>();
+const scope = (signal: AbortSignal, granted: readonly Route[]) => ({
+  signal,
+  paths: new Set(granted.map((route) => routes[route])),
+});
 
 export class YoutubeClient {
   private constructor(private client: Innertube) {}
@@ -20,7 +42,7 @@ export class YoutubeClient {
     network: Network = (request) => fetch(request),
   ) {
     return stage("auth.identity", async () => {
-      const client = await activeSignal.run(signal, () =>
+      const client = await active.run(scope(signal, ["browse"]), () =>
         Innertube.create({
           cookie,
           account_index: 0,
@@ -32,8 +54,9 @@ export class YoutubeClient {
           location: "US",
           fetch: Object.assign(
             async (input: RequestInfo | URL, init?: RequestInit) => {
-              const signal = activeSignal.getStore();
-              if (!signal) throw new SafeError("UPSTREAM_UNAVAILABLE");
+              const current = active.getStore();
+              if (!current) throw new SafeError("UPSTREAM_UNAVAILABLE");
+              const { signal, paths } = current;
               signal.throwIfAborted();
               const request = new Request(input, {
                 ...init,
@@ -44,7 +67,7 @@ export class YoutubeClient {
               if (
                 url.origin !== "https://www.youtube.com" ||
                 request.method !== "POST" ||
-                url.pathname !== "/youtubei/v1/browse"
+                !paths.has(url.pathname)
               )
                 throw new SafeError("UPSTREAM_UNAVAILABLE");
               let response: Response;
@@ -140,10 +163,13 @@ export class YoutubeClient {
   async use<T>(
     signal: AbortSignal,
     operation: (client: Innertube) => Promise<T>,
+    granted: readonly Route[] = ["browse"],
   ): Promise<T> {
     signal.throwIfAborted();
     try {
-      return await activeSignal.run(signal, () => operation(this.client));
+      return await active.run(scope(signal, granted), () =>
+        operation(this.client),
+      );
     } catch (error) {
       if (error instanceof SafeError) throw error;
       throw new SafeError("UPSTREAM_CHANGED");

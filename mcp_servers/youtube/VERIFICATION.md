@@ -1,5 +1,12 @@
 # Verification record
 
+## Approved live check after route scoping: 2026-11-10
+
+After authenticated requests were scoped to named routes, `bun run test:live`
+against the same browser returned five items from each of the seven read
+tools with one account ID and nine valid diagnostic records. Null-in-every-item
+fields were unchanged: `channel_name` for history (Shorts) and channel uploads.
+
 ## Approved live duration check: 2026-11-10
 
 The account owner asked for each change to be checked live. The stdio server

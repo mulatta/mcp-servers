@@ -21,7 +21,17 @@ was accessed for this inspection.
   verified this identity read on one account, not universal compatibility.
 - Generate session context locally and disable Innertube config/player
   retrieval. This avoids unrelated bootstrap requests and lets transport
-  restrict authenticated traffic to the fixed YouTube browse endpoint.
+  restrict authenticated traffic to named routes.
+- Each operation names the routes it may reach; the transport compares the
+  whole request path against that set, so a browse grant never covers
+  `browse/edit_playlist`. Reads grant only `browse`. Write routes are the
+  paths of the YouTube.js 18.3.0 endpoint classes: `PlaylistEditEndpoint`
+  (`browse/edit_playlist`), `CreatePlaylistServiceEndpoint`
+  (`playlist/create`), `DeletePlaylistEndpoint` (`playlist/delete`),
+  `LikeEndpoint` (`like/like`, `like/removelike`), `SubscribeEndpoint`,
+  `UnsubscribeEndpoint` (`subscription/subscribe`, `subscription/unsubscribe`)
+  and `ModifyChannelNotificationPreferenceEndpoint`
+  (`notification/modify_channel_preference`). No tool grants them yet.
 - `account.getInfo(true)` lists accounts using WEB and has `is_selected`, but
   `AccountItem` does not expose a stable channel ID as a dedicated field. Do not
   execute switch-account service endpoints to derive identity.
