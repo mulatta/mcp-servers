@@ -1,0 +1,15 @@
+[project]
+name = "linkedin-mcp"
+version = "0.1.0"
+description = "LinkedIn MCP using an existing local Neko browser over CDP"
+requires-python = ">=3.13,<3.15"
+dependencies = [
+  "anyio>=4.13.0",
+  "mcp-server-linkedin==4.27.0",
+  "patchright==1.63.0",
+  "fastmcp>=4.0.10,<5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
