@@ -6,5 +6,6 @@ export const toolNames = [
   "youtube_get_liked_videos",
   "youtube_get_watch_history",
   "youtube_list_subscriptions",
+  "youtube_get_channel_videos",
 ] as const;
 export type ToolName = (typeof toolNames)[number];

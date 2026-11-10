@@ -35,6 +35,12 @@ was accessed for this inspection.
   `SubscriptionNotificationToggleButton` state whose `stateId` equals
   `currentStateId`; state IDs are opaque, so the icon (`NOTIFICATIONS_ACTIVE`,
   `NOTIFICATIONS_NONE`, `NOTIFICATIONS_OFF`) decides the setting.
+- Channel uploads browse the `UC` channel ID with the Videos-tab params
+  `EgZ2aWRlb3PyBgQKAjoA` in one request, instead of `getChannel()` followed by
+  `getVideos()`, which first loads the channel home and follows its tab
+  endpoint. The tab content is a `richGridRenderer` of `videoRenderer` or video
+  `lockupViewModel` items; on this tab lockup metadata rows carry views and the
+  upload label, not the channel name.
 
 Local source references are under `node_modules/youtubei.js/dist/src/`:
 `core/Session.js`, `core/managers/AccountManager.js`, `utils/HTTPClient.js`,

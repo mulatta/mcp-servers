@@ -1,0 +1,76 @@
+{
+  "contents": {
+    "twoColumnBrowseResultsRenderer": {
+      "tabs": [
+        { "tabRenderer": { "title": "Home", "selected": false } },
+        {
+          "tabRenderer": {
+            "title": "Videos",
+            "selected": true,
+            "content": {
+              "richGridRenderer": {
+                "contents": [
+                  {
+                    "richItemRenderer": {
+                      "content": {
+                        "videoRenderer": {
+                          "videoId": "v0000000011",
+                          "title": { "runs": [{ "text": "Fixture" }] },
+                          "publishedTimeText": { "simpleText": "2 days ago" },
+                          "thumbnailOverlays": [
+                            {
+                              "thumbnailOverlayResumePlaybackRenderer": {
+                                "percentDurationWatched": 50
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "richItemRenderer": {
+                      "content": {
+                        "lockupViewModel": {
+                          "contentId": "v0000000012",
+                          "contentType": "LOCKUP_CONTENT_TYPE_VIDEO",
+                          "metadata": {
+                            "lockupMetadataViewModel": {
+                              "title": { "content": "Fixture" },
+                              "metadata": {
+                                "contentMetadataViewModel": {
+                                  "metadataRows": [
+                                    {
+                                      "metadataParts": [
+                                        { "text": { "content": "1.2K views" } },
+                                        { "text": { "content": "3 weeks ago" } }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "continuationItemRenderer": {
+                      "continuationEndpoint": {
+                        "continuationCommand": {
+                          "token": "fixture-next",
+                          "request": "CONTINUATION_REQUEST_TYPE_BROWSE"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

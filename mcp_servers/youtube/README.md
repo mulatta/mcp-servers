@@ -99,9 +99,11 @@ Client configuration (Claude Code):
 | `youtube_get_liked_videos` | Liked videos | None |
 | `youtube_get_watch_history` | Watch history | None |
 | `youtube_list_subscriptions` | Subscribed channels | None |
+| `youtube_get_channel_videos` | A channel's uploads, newest first | `channel_id` |
 
 All tools accept optional `limit` (integer 1–100, default 50) and `cursor`.
 Playlist IDs contain letters, digits, `_`, or `-`; URLs are not accepted.
+Channel IDs are `UC` plus 22 such characters; handles and URLs are not accepted.
 Unknown arguments are rejected before backend access. All tools declare
 read-only, non-destructive annotations. No write or arbitrary API tools exist.
 
@@ -139,6 +141,10 @@ and `watched_percent`: the 0–100 progress YouTube shows on the thumbnail, or
 `subscriber_count_text` as YouTube displays it, and `notification` (`all`,
 `personalized`, or `none`), the bell setting read from the icon of the
 channel's current notification state.
+`youtube_get_channel_videos` returns the video fields with `channel_name` set to
+`null` (the channel is the requested one) plus `published_text`, YouTube's
+relative upload label such as `2 days ago`. An unknown or removed channel ID
+has no verified response shape yet and fails as an upstream error.
 Current supported history structures do not provide exact watch timestamps:
 `watched_at` is `null`. Relative labels such as `Today` stay in `group_label`.
 

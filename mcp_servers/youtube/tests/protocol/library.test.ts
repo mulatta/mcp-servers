@@ -3,6 +3,7 @@ import playlist from "../fixtures/library/playlist.json";
 import playlists from "../fixtures/library/playlists.json";
 import history from "../fixtures/library/history.json";
 import channels from "../fixtures/library/channels.json";
+import channelVideos from "../fixtures/library/channel-videos.json";
 import { normalize, resultEnvelope } from "../../src/youtube/normalize.ts";
 import { YoutubeClient } from "../../src/youtube/client.ts";
 import { accountPage } from "../fixtures/account.ts";
@@ -25,7 +26,9 @@ test("library reads select fixed endpoints and emit account-bound envelopes", as
               ? history
               : body.browseId === "FEchannels"
                 ? channels
-                : playlist,
+                : body.browseId === "UCfixture000000000000001"
+                  ? channelVideos
+                  : playlist,
       );
     },
   });
@@ -39,7 +42,11 @@ test("library reads select fixed endpoints and emit account-bound envelopes", as
     for (const name of toolNames) {
       const page = await session.value.page(
         name,
-        { limit: 50, playlist_id: "PLfixture" },
+        {
+          limit: 50,
+          playlist_id: "PLfixture",
+          channel_id: "UCfixture000000000000001",
+        },
         signal,
       );
       const result = resultEnvelope(session.accountId, page.items, null);
@@ -55,6 +62,7 @@ test("library reads select fixed endpoints and emit account-bound envelopes", as
       "VLLL",
       "FEhistory",
       "FEchannels",
+      "UCfixture000000000000001",
     ]);
   } finally {
     server.stop(true);

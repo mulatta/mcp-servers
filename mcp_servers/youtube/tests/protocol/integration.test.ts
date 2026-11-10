@@ -73,7 +73,9 @@ for (const level of ["info", "debug"] as const)
             limit: 1,
             ...(name === "youtube_get_playlist"
               ? { playlist_id: "PLfixture" }
-              : {}),
+              : name === "youtube_get_channel_videos"
+                ? { channel_id: "UCfixture000000000000001" }
+                : {}),
           },
         });
         responses.push(result);

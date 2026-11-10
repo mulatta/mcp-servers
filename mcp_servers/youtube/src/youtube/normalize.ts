@@ -18,6 +18,7 @@ const videoSummary = z.strictObject({
   watched_percent: z.number().int().min(0).max(100).nullable(),
   watched_at: z.string().nullable().optional(),
   group_label: z.string().nullable().optional(),
+  published_text: z.string().nullable().optional(),
 });
 const channelSummary = z.strictObject({
   channel_id: z.string().nullable(),
@@ -38,7 +39,8 @@ export type Item =
   | z.infer<typeof channelSummary>;
 export type Page = { items: Item[]; continuation: string | null };
 export type Result = z.infer<typeof resultSchema>;
-export type Kind = "videos" | "playlists" | "history" | "channels";
+export type Kind =
+  "videos" | "playlists" | "history" | "channels" | "channel_videos";
 
 export function resultEnvelope(
   accountId: string,
@@ -148,6 +150,22 @@ function notification(
     object(object(object(current[0]).state).buttonRenderer).icon,
   ).iconType;
   return typeof icon === "string" ? (bells[icon] ?? null) : null;
+}
+// Upload dates are relative labels; lockups mix them with view counts in metadata rows.
+function published(
+  video: Record<string, unknown>,
+  rows: unknown[],
+): string | null {
+  const label = text(video.publishedTimeText);
+  if (label) return label;
+  for (const row of rows) {
+    const parts = object(row).metadataParts;
+    for (const part of Array.isArray(parts) ? parts : []) {
+      const value = text(object(part).text);
+      if (value && / ago$/.test(value)) return value;
+    }
+  }
+  return null;
 }
 function id(value: unknown, pattern: RegExp): string | null {
   return typeof value === "string" && pattern.test(value) ? value : null;
@@ -321,6 +339,10 @@ export function normalize(raw: unknown, kind: Kind): Page {
         n.playlistVideoRenderer ?? n.videoRenderer ?? n.gridVideoRenderer,
       );
       const short = object(n.shortsLockupViewModel);
+      const metadataRows = object(
+        object(lockupMetadata.metadata).contentMetadataViewModel,
+      ).metadataRows;
+      const rows = Array.isArray(metadataRows) ? metadataRows : [];
       if (
         !Object.keys(v).length &&
         !n.shortsLockupViewModel &&
@@ -352,26 +374,23 @@ export function normalize(raw: unknown, kind: Kind): Page {
         video_id: vid,
         title,
         url: vid ? `https://www.youtube.com/watch?v=${vid}` : null,
-        channel_name: text(
-          v.shortBylineText ??
-            v.ownerText ??
-            v.longBylineText ??
-            // Video lockups put the channel first in their metadata rows.
-            object(
-              first(
-                object(
-                  first(
-                    object(
-                      object(lockupMetadata.metadata).contentMetadataViewModel,
-                    ).metadataRows,
-                  ),
-                ).metadataParts,
+        // On a channel's own tab the first lockup row holds views, not the channel.
+        channel_name:
+          kind === "channel_videos"
+            ? null
+            : text(
+                v.shortBylineText ??
+                  v.ownerText ??
+                  v.longBylineText ??
+                  // Video lockups put the channel first in their metadata rows.
+                  object(first(object(first(rows)).metadataParts)).text,
               ),
-            ).text,
-        ),
         availability,
         watched_percent: watchedPercent(v, lockup),
         ...(kind === "history" ? { watched_at: null, group_label: group } : {}),
+        ...(kind === "channel_videos"
+          ? { published_text: published(v, rows) }
+          : {}),
       });
     }
     recognized = true;

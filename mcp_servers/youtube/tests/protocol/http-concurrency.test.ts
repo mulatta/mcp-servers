@@ -36,7 +36,11 @@ test("concurrent HTTP clients share one browser refresh and account", async () =
   const calls = [...toolNames, ...toolNames].map((name) =>
     callTool(url, token, name, {
       limit: 1,
-      ...(name === "youtube_get_playlist" ? { playlist_id: "PLfixture" } : {}),
+      ...(name === "youtube_get_playlist"
+        ? { playlist_id: "PLfixture" }
+        : name === "youtube_get_channel_videos"
+          ? { channel_id: "UCfixture000000000000001" }
+          : {}),
     }),
   );
   const results = await Promise.all(calls);

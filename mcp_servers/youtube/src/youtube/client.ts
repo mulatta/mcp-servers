@@ -103,14 +103,21 @@ export class YoutubeClient {
               ? "VLLL"
               : name === "youtube_list_subscriptions"
                 ? "FEchannels"
-                : `VL${input.playlist_id}`;
+                : name === "youtube_get_channel_videos"
+                  ? input.channel_id
+                  : `VL${input.playlist_id}`;
+    // Selects the Videos tab, newest first, without first loading the channel home.
+    const params =
+      name === "youtube_get_channel_videos"
+        ? { params: "EgZ2aWRlb3PyBgQKAjoA" }
+        : {};
     return this.use(signal, async (client) => {
       const response = await stage("upstream.request", () =>
         client.actions.execute(
           "/browse",
           continuation
             ? { continuation, parse: false }
-            : { browseId, parse: false },
+            : { browseId, ...params, parse: false },
         ),
       );
       return stage("normalize", () =>
@@ -122,7 +129,9 @@ export class YoutubeClient {
               ? "history"
               : name === "youtube_list_subscriptions"
                 ? "channels"
-                : "videos",
+                : name === "youtube_get_channel_videos"
+                  ? "channel_videos"
+                  : "videos",
         ),
       );
     });

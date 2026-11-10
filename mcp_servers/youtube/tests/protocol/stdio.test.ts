@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const names = [
+  "youtube_get_channel_videos",
   "youtube_get_liked_videos",
   "youtube_get_playlist",
   "youtube_get_watch_history",

@@ -12,6 +12,7 @@ export interface ReadInput {
   limit: number;
   cursor?: string | undefined;
   playlist_id?: string | undefined;
+  channel_id?: string | undefined;
 }
 export type Reader = (
   name: ToolName,
@@ -27,6 +28,8 @@ const descriptions: Record<ToolName, string> = {
   youtube_get_watch_history: "Read the authenticated account's watch history.",
   youtube_list_subscriptions:
     "List the channels the authenticated account subscribes to, with each channel's notification setting.",
+  youtube_get_channel_videos:
+    "Read a channel's uploads, newest first, by channel ID.",
 };
 
 export function createServer(
@@ -40,14 +43,16 @@ export function createServer(
     limit: z.number().int().min(1).max(100).default(50),
     cursor: z.string().min(1).max(256).optional(),
   };
+  const targets: Partial<Record<ToolName, z.ZodRawShape>> = {
+    youtube_get_playlist: {
+      playlist_id: z.string().regex(/^[A-Za-z0-9_-]{2,150}$/),
+    },
+    youtube_get_channel_videos: {
+      channel_id: z.string().regex(/^UC[A-Za-z0-9_-]{22}$/),
+    },
+  };
   for (const name of toolNames) {
-    const inputSchema =
-      name === "youtube_get_playlist"
-        ? z.strictObject({
-            ...paging,
-            playlist_id: z.string().regex(/^[A-Za-z0-9_-]{2,150}$/),
-          })
-        : z.strictObject(paging);
+    const inputSchema = z.strictObject({ ...paging, ...targets[name] });
     server.registerTool(
       name,
       {

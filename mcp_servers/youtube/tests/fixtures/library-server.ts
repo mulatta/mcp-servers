@@ -2,6 +2,7 @@ import { accountPage } from "./account.ts";
 import playlists from "./library/playlists.json";
 import history from "./library/history.json";
 import channels from "./library/channels.json";
+import channelVideos from "./library/channel-videos.json";
 import { cdpFixture, cookie } from "./cdp.ts";
 import { SessionProvider } from "../../src/auth/session.ts";
 import { YoutubeClient } from "../../src/youtube/client.ts";
@@ -49,6 +50,13 @@ export function libraryServer(
       if (body.browseId === "FEplaylist_aggregation")
         return Response.json(playlists);
       if (body.browseId === "FEchannels") return Response.json(channels);
+      if (/^UC/.test(body.browseId ?? "")) return Response.json(channelVideos);
+      if (body.continuation === "fixture-next")
+        return Response.json({
+          onResponseReceivedActions: [
+            { appendContinuationItemsAction: { continuationItems: [] } },
+          ],
+        });
       if (body.browseId === "FEhistory") {
         // The sample's continuation is removed for the finite integration fixture.
         const copy = structuredClone(history);

@@ -35,6 +35,8 @@ export async function checkTools(client: Client): Promise<CheckReport[]> {
   let accountId: string | undefined;
   // WL is a real readable playlist even when no account playlist is listed.
   let playlistId = "WL";
+  // The account's own channel is readable even when no subscription is listed.
+  let channelId: string | undefined;
   const reports: CheckReport[] = [];
   for (const name of toolNames) {
     const started = performance.now();
@@ -46,7 +48,9 @@ export async function checkTools(client: Client): Promise<CheckReport[]> {
           limit: 5,
           ...(name === "youtube_get_playlist"
             ? { playlist_id: playlistId }
-            : {}),
+            : name === "youtube_get_channel_videos"
+              ? { channel_id: channelId ?? accountId }
+              : {}),
         },
       });
       if (response.isError) {
@@ -75,6 +79,13 @@ export async function checkTools(client: Client): Promise<CheckReport[]> {
         );
         if (first && "playlist_id" in first && first.playlist_id)
           playlistId = first.playlist_id;
+      }
+      if (name === "youtube_list_subscriptions") {
+        const first = result.items.find(
+          (item) => "channel_id" in item && item.channel_id,
+        );
+        if (first && "channel_id" in first && first.channel_id)
+          channelId = first.channel_id;
       }
       // shortcut: field moves inside known lockups are caught only by this live check,
       // move field extraction onto youtubei.js parsers if another such fix is needed.
