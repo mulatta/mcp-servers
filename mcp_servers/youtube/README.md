@@ -129,7 +129,9 @@ responses contain identical JSON in `structuredContent` and text content:
 
 `youtube_list_playlists` returns `playlist_id`, `title`, and `video_count`.
 All other tools return `video_id`, `title`, `url`, `channel_name`, and
-`availability` (`available`, `private`, `deleted`, `unavailable`, or `null`).
+`availability` (`available`, `private`, `deleted`, `unavailable`, or `null`),
+and `watched_percent`: the 0–100 progress YouTube shows on the thumbnail, or
+`null` when it shows none (unwatched or unknown; never reported as `0`).
 `youtube_get_watch_history` additionally returns `watched_at` and `group_label`.
 Current supported history structures do not provide exact watch timestamps:
 `watched_at` is `null`. Relative labels such as `Today` stay in `group_label`.

@@ -15,7 +15,8 @@
         "title": "[Private video]",
         "url": null,
         "channel_name": null,
-        "availability": "private"
+        "availability": "private",
+        "watched_percent": null
       }
     ],
     "next_cursor": null,
@@ -35,7 +36,8 @@
         "title": "Fixture",
         "url": "https://www.youtube.com/watch?v=v0000000001",
         "channel_name": null,
-        "availability": "available"
+        "availability": "available",
+        "watched_percent": 100
       }
     ],
     "next_cursor": null,
@@ -50,6 +52,7 @@
         "url": "https://www.youtube.com/watch?v=v0000000001",
         "channel_name": null,
         "availability": "available",
+        "watched_percent": 100,
         "watched_at": null,
         "group_label": "Today"
       }

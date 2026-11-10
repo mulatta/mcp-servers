@@ -14,6 +14,8 @@ const videoSummary = z.strictObject({
   availability: z
     .enum(["available", "private", "deleted", "unavailable"])
     .nullable(),
+  // Null means YouTube showed no progress, which covers both unwatched and unknown.
+  watched_percent: z.number().int().min(0).max(100).nullable(),
   watched_at: z.string().nullable().optional(),
   group_label: z.string().nullable().optional(),
 });
@@ -81,6 +83,33 @@ function badgeCount(lockup: Record<string, unknown>): number | null {
       );
       if (match) return Number(match[1]!.replaceAll(",", ""));
     }
+  }
+  return null;
+}
+function percent(value: unknown): number | null {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 100
+    ? Number(value)
+    : null;
+}
+// Renderers carry a resume overlay; lockups carry a bottom progress bar.
+function watchedPercent(
+  video: Record<string, unknown>,
+  lockup: Record<string, unknown>,
+): number | null {
+  for (const overlay of Array.isArray(video.thumbnailOverlays)
+    ? video.thumbnailOverlays
+    : []) {
+    const resume = object(overlay).thumbnailOverlayResumePlaybackRenderer;
+    if (resume) return percent(object(resume).percentDurationWatched);
+  }
+  const thumbnail = object(object(lockup.contentImage).thumbnailViewModel);
+  for (const overlay of Array.isArray(thumbnail.overlays)
+    ? thumbnail.overlays
+    : []) {
+    const bar = object(
+      object(object(overlay).thumbnailBottomOverlayViewModel).progressBar,
+    ).thumbnailOverlayProgressBarViewModel;
+    if (bar) return percent(object(bar).startPercent);
   }
   return null;
 }
@@ -289,6 +318,7 @@ export function normalize(raw: unknown, kind: Kind): Page {
             ).text,
         ),
         availability,
+        watched_percent: watchedPercent(v, lockup),
         ...(kind === "history" ? { watched_at: null, group_label: group } : {}),
       });
     }
