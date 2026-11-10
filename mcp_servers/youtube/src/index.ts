@@ -6,7 +6,9 @@ import {
   ConfigError,
   readLogLevel,
   readTransport,
+  readWrites,
   type TransportConfig,
+  type WriteGroup,
 } from "./config.ts";
 import { startHttp, validToken } from "./http.ts";
 import { Logger } from "./observability/logger.ts";
@@ -58,13 +60,17 @@ export async function start(
     };
     let transport: TransportConfig;
     let token = "";
+    let writes: ReadonlySet<WriteGroup>;
     try {
+      writes = readWrites();
       transport = readTransport();
       if (transport.kind === "http")
         token = await readToken(transport.tokenFile);
     } catch (error) {
       return refuse(error);
     }
+    // Logged so an operator can see from the journal whether writes are on.
+    const started = writes.size ? { writes: [...writes] } : {};
     const shared = reader ?? createReader();
     let closing = false;
     let close = async () => {};
@@ -92,7 +98,7 @@ export async function start(
         timeoutMs: options.timeoutMs,
       }).catch(refuse);
       close = () => http.stop();
-      diagnostics.emit({ event: "server.start" });
+      diagnostics.emit({ event: "server.start", ...started });
       return;
     }
     const server = createServer(shared, { ...options, logger: diagnostics });
@@ -105,7 +111,7 @@ export async function start(
       void stop("transport_closed");
     });
     await server.connect(new StdioServerTransport());
-    diagnostics.emit({ event: "server.start" });
+    diagnostics.emit({ event: "server.start", ...started });
   } catch {
     fatal();
   }

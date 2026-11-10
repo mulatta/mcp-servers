@@ -32,6 +32,19 @@
       default = "http://127.0.0.1:9222";
       description = "Chrome DevTools Protocol endpoint of the signed-in browser.";
     };
+    writes = {
+      type = types.listOf (
+        types.enum "writeGroup" [
+          "playlist"
+          "rating"
+          "subscription"
+          "notification"
+          "all"
+        ]
+      );
+      default = [ ];
+      description = "Write tool groups to expose; empty keeps the server read-only.";
+    };
     logLevel = {
       type = types.enum "logLevel" [
         "error"
@@ -77,6 +90,7 @@
           YOUTUBE_HTTP_TOKEN_FILE = "%d/token";
           YOUTUBE_CDP_URL = options.cdpUrl;
           YOUTUBE_LOG_LEVEL = options.logLevel;
+          YOUTUBE_WRITES = lib.concatStringsSep "," options.writes;
         };
         serviceConfig = {
           ExecStart = lib.getExe package;

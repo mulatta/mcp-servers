@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isDeepStrictEqual } from "node:util";
 import type { Writable } from "node:stream";
 import { BoundedWriter } from "./writer.ts";
-import type { LogLevel } from "../config.ts";
+import { writeGroups, type LogLevel } from "../config.ts";
 import { isErrorCode, type ErrorCode } from "../errors.ts";
 import { toolNames } from "../tools.ts";
 
@@ -57,7 +57,10 @@ function events<T extends z.ZodType>(id: T) {
     ...caches,
   };
   return z.union([
-    z.object({ event: z.literal("server.start") }),
+    z.object({
+      event: z.literal("server.start"),
+      writes: z.array(z.enum(writeGroups)).optional(),
+    }),
     z.object({
       event: z.literal("server.stop"),
       reason: z.enum(["SIGINT", "SIGTERM", "transport_closed"]),
@@ -72,6 +75,7 @@ function events<T extends z.ZodType>(id: T) {
         "INVALID_LOG_LEVEL",
         "INVALID_TRANSPORT",
         "INVALID_HTTP_CONFIG",
+        "INVALID_WRITES",
       ]),
     }),
     z.object({

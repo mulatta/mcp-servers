@@ -107,6 +107,13 @@ Channel IDs are `UC` plus 22 such characters; handles and URLs are not accepted.
 Unknown arguments are rejected before backend access. All tools declare
 read-only, non-destructive annotations. No write or arbitrary API tools exist.
 
+`YOUTUBE_WRITES` selects write tool groups: a comma-separated subset of
+`playlist`, `rating`, `subscription` and `notification`, or `all` on its own.
+Unset or empty keeps the server read-only. Any other value, including `all`
+beside a group name, refuses to start with `INVALID_WRITES`, so a typo cannot
+silently enable or drop a group. `server.start` lists the enabled groups. The
+flakelet module exposes the same list as `writes`. No group has tools yet.
+
 Example MCP call arguments:
 
 ```json

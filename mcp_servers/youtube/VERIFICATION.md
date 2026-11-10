@@ -1,5 +1,12 @@
 # Verification record
 
+## Approved live check of write configuration: 2026-11-10
+
+With `YOUTUBE_WRITES=all` against the same browser, `server.start` listed all
+four groups, discovery still returned the seven read tools (no group has tools
+yet), and a Watch Later read returned five items. `YOUTUBE_WRITES=playlists`
+exited with status 1 and `INVALID_WRITES` before serving.
+
 ## Approved live check after route scoping: 2026-11-10
 
 After authenticated requests were scoped to named routes, `bun run test:live`

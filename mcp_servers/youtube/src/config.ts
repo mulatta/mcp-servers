@@ -36,7 +36,8 @@ export function readConfig(
   }
 }
 
-export type ConfigCode = "INVALID_TRANSPORT" | "INVALID_HTTP_CONFIG";
+export type ConfigCode =
+  "INVALID_TRANSPORT" | "INVALID_HTTP_CONFIG" | "INVALID_WRITES";
 
 export class ConfigError extends Error {
   constructor(readonly code: ConfigCode) {
@@ -75,4 +76,30 @@ export function readTransport(
       .split(",")
       .map((host) => host.trim()),
   };
+}
+
+export const writeGroups = [
+  "playlist",
+  "rating",
+  "subscription",
+  "notification",
+] as const;
+export type WriteGroup = (typeof writeGroups)[number];
+
+// Unset or empty keeps the server read-only. Any unknown token refuses to start,
+// so a typo can neither enable nor silently drop a group.
+export function readWrites(
+  env: Record<string, string | undefined> = process.env,
+): ReadonlySet<WriteGroup> {
+  const raw = env.YOUTUBE_WRITES ?? "";
+  if (raw === "") return new Set();
+  const tokens = raw.split(",").map((token) => token.trim());
+  if (tokens.length === 1 && tokens[0] === "all") return new Set(writeGroups);
+  const groups = new Set<WriteGroup>();
+  for (const token of tokens) {
+    if (!(writeGroups as readonly string[]).includes(token))
+      throw new ConfigError("INVALID_WRITES");
+    groups.add(token as WriteGroup);
+  }
+  return groups;
 }
