@@ -63,14 +63,21 @@ class BrowserSession:
                     page = await self._connect()
                 await anyio.lowlevel.checkpoint()
                 yield page
+                if self._browser is None or not self._browser.is_connected():
+                    raise BrowserConnectionError()
             except Error:
                 disconnected = self._browser is None or not self._browser.is_connected()
                 await self._close()
                 if disconnected:
                     raise BrowserConnectionError() from None
                 raise
-            except BaseException:
+            except BaseException as error:
+                disconnected = (
+                    self._browser is not None and not self._browser.is_connected()
+                )
                 await self._close()
+                if disconnected and isinstance(error, Exception):
+                    raise BrowserConnectionError() from None
                 raise
 
     async def _close(self) -> None:
