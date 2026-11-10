@@ -1,0 +1,7 @@
+bun.lock
+node_modules/
+dist/
+coverage/
+
+# Markdown belongs to mdformat through the repository formatter.
+**/*.md
