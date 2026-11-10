@@ -1,5 +1,13 @@
 # Verification record
 
+## Approved live subscription check: 2026-11-10
+
+With `YOUTUBE_WRITES=subscription`, a channel absent from the account's 357
+subscriptions was subscribed (listed after about 5.8 s) and unsubscribed (gone
+after about 5.8 s); afterwards the subscription set matched the original. A
+key-only probe beforehand established the `updateSubscribeButtonAction`
+confirmation and also left the account as it was.
+
 ## Approved live rating check: 2026-11-10
 
 With `YOUTUBE_WRITES=rating`, a public upload absent from the account's 3,128

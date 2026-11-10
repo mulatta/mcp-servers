@@ -124,6 +124,8 @@ flakelet module exposes the same list as `writes`.
 | `playlist` | `youtube_move_in_playlist` | `playlist_id` (`PL…` or `WL`), `video_id`, `after_video_id` | No |
 | `rating` | `youtube_like_video` | `video_id` | No |
 | `rating` | `youtube_remove_rating` | `video_id` | Yes |
+| `subscription` | `youtube_subscribe` | `channel_id` (`UC…`) | No |
+| `subscription` | `youtube_unsubscribe` | `channel_id` (`UC…`) | Yes |
 
 Write tools declare `readOnlyHint: false` and `idempotentHint: false`; deletes
 also declare `destructiveHint: true`. A write is sent once and never retried.
@@ -139,7 +141,8 @@ pages; it refuses with `PLAYLIST_ITEM_NOT_FOUND`, `PLAYLIST_ITEM_AMBIGUOUS` (a
 video listed twice) or `PLAYLIST_TOO_LONG` before sending anything. Moving to
 the very top is not supported. A rating counts as done only when YouTube
 returns the video's new like status (`LIKE`, or `INDIFFERENT` after removal);
-there is no dislike tool.
+there is no dislike tool. A subscription change counts as done only when
+YouTube's subscribe-button update names the channel with the requested state.
 
 Example MCP call arguments:
 

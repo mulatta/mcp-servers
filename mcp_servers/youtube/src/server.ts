@@ -156,6 +156,7 @@ const editablePlaylist = z
   .refine((id) => id === "WL" || userPlaylistId.test(id));
 // A repeated ID would add the video twice, which is rarely what a caller meant.
 const videoId = z.string().regex(/^[A-Za-z0-9_-]{11}$/);
+const channelId = z.string().regex(/^UC[A-Za-z0-9_-]{22}$/);
 const videoBatch = z
   .array(videoId)
   .min(1)
@@ -230,6 +231,17 @@ const writeTools: Record<
     description:
       "Remove the authenticated account's like or dislike from a video.",
     input: { video_id: videoId },
+    destructive: true,
+  },
+  youtube_subscribe: {
+    description: "Subscribe the authenticated account to a channel by UC ID.",
+    input: { channel_id: channelId },
+    destructive: false,
+  },
+  youtube_unsubscribe: {
+    description:
+      "Unsubscribe the authenticated account from a channel by UC ID.",
+    input: { channel_id: channelId },
     destructive: true,
   },
 };

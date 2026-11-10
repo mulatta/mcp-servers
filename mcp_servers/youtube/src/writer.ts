@@ -102,6 +102,18 @@ const operations: Record<WriteToolName, Operation> = {
     "INDIFFERENT",
     "none",
   ),
+  youtube_subscribe: subscription(
+    "subscribe",
+    "/subscription/subscribe",
+    "EgIIAhgA",
+    true,
+  ),
+  youtube_unsubscribe: subscription(
+    "unsubscribe",
+    "/subscription/unsubscribe",
+    "CgIIAhgA",
+    false,
+  ),
   // YouTube.js 18.3.0 setName() sends `playlist_id` instead of `playlistId`,
   // so the edit body is built here for both fields.
   youtube_update_playlist: {
@@ -186,6 +198,33 @@ function rate(
       });
       if (!confirmed) throw new SafeError("WRITE_OUTCOME_UNKNOWN");
       return { video_id: input.video_id, rating };
+    },
+  };
+}
+
+// Params are the fixed values YouTube.js 18.3.0 sends for these endpoints.
+function subscription(
+  route: Route,
+  path: string,
+  params: string,
+  subscribed: boolean,
+): Operation {
+  return {
+    routes: [route],
+    path,
+    body: (input) => ({ channelIds: [input.channel_id], params }),
+    result: (data, input) => {
+      const actions = Array.isArray(data.actions) ? data.actions : [];
+      const confirmed = actions.some((action) => {
+        const update = (action as Record<string, unknown>)
+          .updateSubscribeButtonAction as Record<string, unknown> | undefined;
+        return (
+          update?.channelId === input.channel_id &&
+          update?.subscribed === subscribed
+        );
+      });
+      if (!confirmed) throw new SafeError("WRITE_OUTCOME_UNKNOWN");
+      return { channel_id: input.channel_id, subscribed };
     },
   };
 }

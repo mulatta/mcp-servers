@@ -53,6 +53,11 @@ was accessed for this inspection.
   confirmed the web body `{ target: { videoId } }` on `like/like` and
   `like/removelike`; both answer with a `frameworkUpdates.entityBatchUpdate`
   mutation whose `likeStatusEntity.likeStatus` is `LIKE` or `INDIFFERENT`.
+- Subscribing posts `{ channelIds, params: "EgIIAhgA" }` to
+  `subscription/subscribe` and unsubscribing `{ channelIds, params: "CgIIAhgA" }`
+  to `subscription/unsubscribe`, the values `InteractionManager` uses. Both
+  answer with `actions[].updateSubscribeButtonAction` (`channelId`,
+  `subscribed`), which the tools require to match the request.
 - `account.getInfo(true)` lists accounts using WEB and has `is_selected`, but
   `AccountItem` does not expose a stable channel ID as a dedicated field. Do not
   execute switch-account service endpoints to derive identity.
