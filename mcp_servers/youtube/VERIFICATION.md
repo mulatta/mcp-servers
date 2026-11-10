@@ -1,5 +1,42 @@
 # Verification record
 
+## Approved live HTTP check: 2026-11-10
+
+The account owner explicitly requested a live read of five items with each
+tool over the HTTP transport. The server ran from commit `bf2da7a` on the
+browser's host with `YOUTUBE_TRANSPORT=http`, a random 64-hex-character token
+file, a loopback listener, and `YOUTUBE_CDP_URL=http://127.0.0.1:9222`. A
+throwaway client posted JSON-RPC directly and printed only counts, flags,
+timings, and error codes. As above, no cookie, token, account ID,
+playlist/video ID, title, or response body is stored here.
+
+| Request | Returned | More pages | Elapsed |
+| ---------------------------------------- | -------: | ---------- | ------: |
+| No `Authorization` header | 401 | — | — |
+| `initialize` / `tools/list` | 5 tools | — | — |
+| `youtube_list_playlists` (concurrent) | 5 | Yes | 546 ms |
+| `youtube_get_watch_later` (concurrent) | 5 | Yes | 892 ms |
+| `youtube_get_liked_videos` | 5 | Yes | 521 ms |
+| `youtube_get_watch_history` | 5 | Yes | 928 ms |
+| `youtube_get_playlist` | 5 | Yes | 429 ms |
+| Watch Later cursor, two concurrent calls | 5 each | Yes | 2–3 ms |
+
+Every successful response carried an account ID. The playlist ID came from
+the first `youtube_list_playlists` result. The two cursor followers returned
+byte-identical JSON-RPC responses.
+
+Info-level diagnostics: one `server.start`, seven `request.end` (all `ok`),
+two `http.rejected` with status 401 (the readiness probe and the anonymous
+request), and one `server.stop` after SIGTERM. Authentication cache states
+were `miss`, then `shared` for the concurrent request, then `hit` for every
+later request, so CDP was used once. The cursor followers recorded page cache
+`buffer` and `replay`, with no additional upstream request. The token did not
+appear in diagnostics.
+
+Not covered: a reverse proxy in front of the listener, `allowedHosts` other
+than the loopback defaults, clients other than direct JSON-RPC, and
+deployment as a service.
+
 ## Approved live check: 2026-10-11
 
 The account owner explicitly approved reading five items with each tool.
