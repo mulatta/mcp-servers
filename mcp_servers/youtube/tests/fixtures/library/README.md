@@ -19,5 +19,7 @@ Tests derive bounded empty, duplicate, private/deleted, malformed and
 continuation cases from these sanitized structural fixtures. WL and LL use
 playlist-content fixtures with the requested browse ID asserted at the HTTP
 boundary; these are not claimed to be captures of those private lists.
-Account settings fixture in `../account.ts` is synthetic and source-derived,
+`channels.json` is synthetic: its FEchannels layout follows the youtubei.js
+18.3.0 `Channel`, `SubscribeButton` and `SubscriptionNotificationToggleButton`
+parsers, not a captured response. Account settings fixture in `../account.ts` is synthetic and source-derived,
 not a captured response. Live account compatibility remains unverified.

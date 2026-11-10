@@ -101,7 +101,9 @@ export class YoutubeClient {
             ? "VLWL"
             : name === "youtube_get_liked_videos"
               ? "VLLL"
-              : `VL${input.playlist_id}`;
+              : name === "youtube_list_subscriptions"
+                ? "FEchannels"
+                : `VL${input.playlist_id}`;
     return this.use(signal, async (client) => {
       const response = await stage("upstream.request", () =>
         client.actions.execute(
@@ -118,7 +120,9 @@ export class YoutubeClient {
             ? "playlists"
             : name === "youtube_get_watch_history"
               ? "history"
-              : "videos",
+              : name === "youtube_list_subscriptions"
+                ? "channels"
+                : "videos",
         ),
       );
     });

@@ -2,12 +2,13 @@ import { expect, test } from "bun:test";
 import playlist from "../fixtures/library/playlist.json";
 import playlists from "../fixtures/library/playlists.json";
 import history from "../fixtures/library/history.json";
+import channels from "../fixtures/library/channels.json";
 import { normalize, resultEnvelope } from "../../src/youtube/normalize.ts";
 import { YoutubeClient } from "../../src/youtube/client.ts";
 import { accountPage } from "../fixtures/account.ts";
 import { toolNames } from "../../src/server.ts";
 
-test("five library reads select fixed endpoints and emit account-bound envelopes", async () => {
+test("library reads select fixed endpoints and emit account-bound envelopes", async () => {
   const seen: string[] = [];
   const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -22,7 +23,9 @@ test("five library reads select fixed endpoints and emit account-bound envelopes
             ? playlists
             : body.browseId === "FEhistory"
               ? history
-              : playlist,
+              : body.browseId === "FEchannels"
+                ? channels
+                : playlist,
       );
     },
   });
@@ -51,6 +54,7 @@ test("five library reads select fixed endpoints and emit account-bound envelopes
       "VLWL",
       "VLLL",
       "FEhistory",
+      "FEchannels",
     ]);
   } finally {
     server.stop(true);

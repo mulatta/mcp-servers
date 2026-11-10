@@ -7,7 +7,7 @@ import { resultSchema } from "../../src/youtube/normalize.ts";
 import { libraryServer } from "../fixtures/library-server.ts";
 import { checkTools } from "../integration/check-tools.ts";
 
-test("live check calls five MCP tools with limit five and discovers the playlist ID", async () => {
+test("live check calls every MCP tool with limit five and discovers the playlist ID", async () => {
   const f = libraryServer({ pages: [100] });
   const pager = new Paginator(f.sessions);
   const calls: { name: string; input: ReadInput }[] = [];
@@ -26,13 +26,14 @@ test("live check calls five MCP tools with limit five and discovers the playlist
       true,
     );
     expect(calls[1]!.input.playlist_id).toBe("PLfixture0000000016");
-    expect(reports.map((r) => r.items)).toEqual([2, 5, 5, 5, 5]);
+    expect(reports.map((r) => r.items)).toEqual([2, 5, 5, 5, 5, 2]);
     // Fixture lockups carry no count badge and only history names channels.
     expect(reports.map((r) => r.null_fields)).toEqual([
       ["video_count"],
       ["channel_name"],
       ["channel_name"],
       ["channel_name"],
+      [],
       [],
     ]);
     expect(

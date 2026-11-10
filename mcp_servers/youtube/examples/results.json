@@ -59,5 +59,19 @@
     ],
     "next_cursor": null,
     "has_more": false
+  },
+  "youtube_list_subscriptions": {
+    "account_id": "UCaaaaaaaaaaaaaaaaaaaaaa",
+    "items": [
+      {
+        "channel_id": "UCfixture000000000000001",
+        "title": "Fixture",
+        "handle": "@fixture",
+        "subscriber_count_text": "1.2K subscribers",
+        "notification": "personalized"
+      }
+    ],
+    "next_cursor": null,
+    "has_more": false
   }
 }

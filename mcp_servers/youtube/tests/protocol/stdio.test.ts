@@ -10,9 +10,10 @@ const names = [
   "youtube_get_watch_history",
   "youtube_get_watch_later",
   "youtube_list_playlists",
+  "youtube_list_subscriptions",
 ];
 
-test("stdio discovery works without browser credentials and exposes only five reads", async () => {
+test("stdio discovery works without browser credentials and exposes only the read tools", async () => {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: ["run", "src/index.ts"],

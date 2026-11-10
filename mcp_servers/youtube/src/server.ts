@@ -5,14 +5,9 @@ import { withDeadline } from "./deadline.ts";
 import { withRequest } from "./observability/trace.ts";
 import type { Logger } from "./observability/logger.ts";
 
-export const toolNames = [
-  "youtube_list_playlists",
-  "youtube_get_playlist",
-  "youtube_get_watch_later",
-  "youtube_get_liked_videos",
-  "youtube_get_watch_history",
-] as const;
-export type ToolName = (typeof toolNames)[number];
+import { toolNames, type ToolName } from "./tools.ts";
+
+export { toolNames, type ToolName };
 export interface ReadInput {
   limit: number;
   cursor?: string | undefined;
@@ -30,6 +25,8 @@ const descriptions: Record<ToolName, string> = {
   youtube_get_watch_later: "Read the authenticated account's Watch Later list.",
   youtube_get_liked_videos: "Read the authenticated account's liked videos.",
   youtube_get_watch_history: "Read the authenticated account's watch history.",
+  youtube_list_subscriptions:
+    "List the channels the authenticated account subscribes to, with each channel's notification setting.",
 };
 
 export function createServer(

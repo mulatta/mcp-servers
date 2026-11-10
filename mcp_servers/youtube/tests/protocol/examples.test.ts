@@ -3,7 +3,7 @@ import examples from "../../examples/results.json";
 import { resultSchema } from "../../src/youtube/normalize.ts";
 import { toolNames } from "../../src/server.ts";
 
-test("documented examples cover all five tools and satisfy output schema", () => {
+test("documented examples cover every tool and satisfy output schema", () => {
   expect(Object.keys(examples)).toEqual([...toolNames]);
   for (const example of Object.values(examples)) {
     expect(resultSchema.safeParse(example).success).toBe(true);

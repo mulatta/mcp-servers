@@ -29,6 +29,12 @@ was accessed for this inspection.
   constructing a client. Do not return raw errors, request bodies, or headers.
 - `getPlaylists()`, `getPlaylist("WL")`, `getPlaylist("LL")`, and `getHistory()`
   provide read surfaces. Continuation processing must preserve remaining items.
+- `getChannelsFeed()` browses `FEchannels`, the subscribed-channel list. Its
+  `Channel` parser notes that `subscriberCountText` now carries the handle and
+  `videoCountText` the subscriber count. The bell setting is the
+  `SubscriptionNotificationToggleButton` state whose `stateId` equals
+  `currentStateId`; state IDs are opaque, so the icon (`NOTIFICATIONS_ACTIVE`,
+  `NOTIFICATIONS_NONE`, `NOTIFICATIONS_OFF`) decides the setting.
 
 Local source references are under `node_modules/youtubei.js/dist/src/`:
 `core/Session.js`, `core/managers/AccountManager.js`, `utils/HTTPClient.js`,

@@ -2,11 +2,12 @@
 
 Read-only YouTube MCP server using Bun and TypeScript.
 
-Five read-only tools are connected to the CDP session provider, YouTube.js
+Read-only tools are connected to the CDP session provider, YouTube.js
 adapter, normalization, and bounded pagination. The server speaks MCP over
 stdio or authenticated HTTP. Discovery is credential free; actual reads
 authenticate lazily. Local integration tests pass. Approved live checks over
-both transports returned five items from each tool on one account;
+both transports returned five items from each of the first five tools on one
+account; tools added later await their own approved live check;
 see [VERIFICATION.md](VERIFICATION.md) for scope and remaining limits.
 
 ## Development
@@ -97,10 +98,11 @@ Client configuration (Claude Code):
 | `youtube_get_watch_later` | Watch Later | None |
 | `youtube_get_liked_videos` | Liked videos | None |
 | `youtube_get_watch_history` | Watch history | None |
+| `youtube_list_subscriptions` | Subscribed channels | None |
 
 All tools accept optional `limit` (integer 1–100, default 50) and `cursor`.
 Playlist IDs contain letters, digits, `_`, or `-`; URLs are not accepted.
-Unknown arguments are rejected before backend access. All five tools declare
+Unknown arguments are rejected before backend access. All tools declare
 read-only, non-destructive annotations. No write or arbitrary API tools exist.
 
 Example MCP call arguments:
@@ -119,7 +121,7 @@ seconds return `TIMEOUT` and abort their backend signal.
 
 ## Results
 
-[Validated examples](examples/results.json) cover all five tools. Successful
+[Validated examples](examples/results.json) cover every tool. Successful
 responses contain identical JSON in `structuredContent` and text content:
 
 - `account_id`: verified, pinned channel ID, not a display name or email.
@@ -133,6 +135,10 @@ All other tools return `video_id`, `title`, `url`, `channel_name`, and
 and `watched_percent`: the 0–100 progress YouTube shows on the thumbnail, or
 `null` when it shows none (unwatched or unknown; never reported as `0`).
 `youtube_get_watch_history` additionally returns `watched_at` and `group_label`.
+`youtube_list_subscriptions` returns `channel_id`, `title`, `handle` (`@name`),
+`subscriber_count_text` as YouTube displays it, and `notification` (`all`,
+`personalized`, or `none`), the bell setting read from the icon of the
+channel's current notification state.
 Current supported history structures do not provide exact watch timestamps:
 `watched_at` is `null`. Relative labels such as `Today` stay in `group_label`.
 

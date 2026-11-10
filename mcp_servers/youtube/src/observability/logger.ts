@@ -4,6 +4,7 @@ import type { Writable } from "node:stream";
 import { BoundedWriter } from "./writer.ts";
 import type { LogLevel } from "../config.ts";
 import { isErrorCode, type ErrorCode } from "../errors.ts";
+import { toolNames } from "../tools.ts";
 
 export class CorrelationId {
   readonly value = crypto.randomUUID();
@@ -50,13 +51,7 @@ function events<T extends z.ZodType>(id: T) {
   const request = {
     event: z.literal("request.end"),
     request_id: id,
-    tool: z.enum([
-      "youtube_list_playlists",
-      "youtube_get_playlist",
-      "youtube_get_watch_later",
-      "youtube_get_liked_videos",
-      "youtube_get_watch_history",
-    ]),
+    tool: z.enum(toolNames),
     limit: z.number().int().min(1).max(100),
     duration_ms: duration,
     ...caches,

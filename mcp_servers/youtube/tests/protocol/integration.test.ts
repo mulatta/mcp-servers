@@ -15,7 +15,7 @@ async function until(predicate: () => boolean) {
 }
 
 for (const level of ["info", "debug"] as const)
-  test(`stdio to CDP/upstream preserves five tools, interruption and privacy (${level})`, async () => {
+  test(`stdio to CDP/upstream preserves every tool, interruption and privacy (${level})`, async () => {
     const cwd = await mkdtemp(join(tmpdir(), "youtube-observability-"));
     const secret = crypto.randomUUID();
     const f = libraryServer({ pages: [4], cookieValue: secret });
@@ -60,7 +60,7 @@ for (const level of ["info", "debug"] as const)
     };
     try {
       await client.connect(transport, { timeout: 3000 });
-      expect((await client.listTools()).tools).toHaveLength(5);
+      expect((await client.listTools()).tools).toHaveLength(toolNames.length);
       expect(f.browser.discoveries).toBe(0);
       expect(f.paths).toEqual([]);
       const concurrent = await Promise.all([call(), call()]);
@@ -141,9 +141,13 @@ for (const level of ["info", "debug"] as const)
       expect(records.filter((r) => r.event === "server.start")).toHaveLength(1);
       expect(records.filter((r) => r.event === "server.stop")).toHaveLength(1);
       const summaries = records.filter((r) => r.event === "request.end");
-      expect(summaries).toHaveLength(11);
-      expect(new Set(summaries.map((r) => r.request_id)).size).toBe(11);
-      expect(summaries.filter((r) => r.outcome === "ok")).toHaveLength(7);
+      // Two concurrent calls, one per tool, then four interrupted or refused calls.
+      const total = toolNames.length + 6;
+      expect(summaries).toHaveLength(total);
+      expect(new Set(summaries.map((r) => r.request_id)).size).toBe(total);
+      expect(summaries.filter((r) => r.outcome === "ok")).toHaveLength(
+        toolNames.length + 2,
+      );
       for (const outcome of ["timeout", "cancelled"]) {
         const interrupted = summaries.filter((r) => r.outcome === outcome);
         expect(interrupted).toHaveLength(1);

@@ -1,0 +1,149 @@
+{
+  "contents": {
+    "twoColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "selected": true,
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "itemSectionRenderer": {
+                      "contents": [
+                        {
+                          "shelfRenderer": {
+                            "content": {
+                              "expandedShelfContentsRenderer": {
+                                "items": [
+                                  {
+                                    "channelRenderer": {
+                                      "channelId": "UCfixture000000000000001",
+                                      "title": { "simpleText": "Fixture" },
+                                      "subscriberCountText": {
+                                        "simpleText": "@fixture1"
+                                      },
+                                      "videoCountText": {
+                                        "simpleText": "1.2K subscribers"
+                                      },
+                                      "subscribeButton": {
+                                        "subscribeButtonRenderer": {
+                                          "subscribed": true,
+                                          "notificationPreferenceButton": {
+                                            "subscriptionNotificationToggleButtonRenderer": {
+                                              "currentStateId": 3,
+                                              "states": [
+                                                {
+                                                  "stateId": 2,
+                                                  "nextStateId": 2,
+                                                  "state": {
+                                                    "buttonRenderer": {
+                                                      "icon": {
+                                                        "iconType": "NOTIFICATIONS_NONE"
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "stateId": 3,
+                                                  "nextStateId": 3,
+                                                  "state": {
+                                                    "buttonRenderer": {
+                                                      "icon": {
+                                                        "iconType": "NOTIFICATIONS_ACTIVE"
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "stateId": 4,
+                                                  "nextStateId": 4,
+                                                  "state": {
+                                                    "buttonRenderer": {
+                                                      "icon": {
+                                                        "iconType": "NOTIFICATIONS_OFF"
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "channelRenderer": {
+                                      "channelId": "UCfixture000000000000002",
+                                      "title": { "simpleText": "Fixture" },
+                                      "subscriberCountText": {
+                                        "simpleText": "@fixture2"
+                                      },
+                                      "videoCountText": {
+                                        "simpleText": "3 subscribers"
+                                      },
+                                      "subscribeButton": {
+                                        "subscribeButtonRenderer": {
+                                          "subscribed": true,
+                                          "notificationPreferenceButton": {
+                                            "subscriptionNotificationToggleButtonRenderer": {
+                                              "currentStateId": 4,
+                                              "states": [
+                                                {
+                                                  "stateId": 2,
+                                                  "nextStateId": 2,
+                                                  "state": {
+                                                    "buttonRenderer": {
+                                                      "icon": {
+                                                        "iconType": "NOTIFICATIONS_NONE"
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "stateId": 3,
+                                                  "nextStateId": 3,
+                                                  "state": {
+                                                    "buttonRenderer": {
+                                                      "icon": {
+                                                        "iconType": "NOTIFICATIONS_ACTIVE"
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "stateId": 4,
+                                                  "nextStateId": 4,
+                                                  "state": {
+                                                    "buttonRenderer": {
+                                                      "icon": {
+                                                        "iconType": "NOTIFICATIONS_OFF"
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

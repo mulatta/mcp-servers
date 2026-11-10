@@ -19,17 +19,26 @@ const videoSummary = z.strictObject({
   watched_at: z.string().nullable().optional(),
   group_label: z.string().nullable().optional(),
 });
+const channelSummary = z.strictObject({
+  channel_id: z.string().nullable(),
+  title: z.string().nullable(),
+  handle: z.string().nullable(),
+  subscriber_count_text: z.string().nullable(),
+  notification: z.enum(["all", "personalized", "none"]).nullable(),
+});
 export const resultSchema = z.strictObject({
   account_id: z.string().min(1),
-  items: z.array(z.union([playlistSummary, videoSummary])),
+  items: z.array(z.union([playlistSummary, videoSummary, channelSummary])),
   next_cursor: z.string().nullable(),
   has_more: z.boolean(),
 });
 export type Item =
-  z.infer<typeof playlistSummary> | z.infer<typeof videoSummary>;
+  | z.infer<typeof playlistSummary>
+  | z.infer<typeof videoSummary>
+  | z.infer<typeof channelSummary>;
 export type Page = { items: Item[]; continuation: string | null };
 export type Result = z.infer<typeof resultSchema>;
-export type Kind = "videos" | "playlists" | "history";
+export type Kind = "videos" | "playlists" | "history" | "channels";
 
 export function resultEnvelope(
   accountId: string,
@@ -113,6 +122,33 @@ function watchedPercent(
   }
   return null;
 }
+const bells: Record<string, "all" | "personalized" | "none"> = {
+  NOTIFICATIONS_ACTIVE: "all",
+  NOTIFICATIONS_NONE: "personalized",
+  NOTIFICATIONS_OFF: "none",
+};
+// State IDs are opaque, so the bell is read from the icon of the current state.
+function notification(
+  channel: Record<string, unknown>,
+): "all" | "personalized" | "none" | null {
+  const toggle = object(
+    object(
+      object(object(channel.subscribeButton).subscribeButtonRenderer)
+        .notificationPreferenceButton,
+    ).subscriptionNotificationToggleButtonRenderer,
+  );
+  const states = Array.isArray(toggle.states) ? toggle.states : [];
+  const current = states.filter(
+    (state) =>
+      toggle.currentStateId !== undefined &&
+      object(state).stateId === toggle.currentStateId,
+  );
+  if (current.length !== 1) return null;
+  const icon = object(
+    object(object(object(current[0]).state).buttonRenderer).icon,
+  ).iconType;
+  return typeof icon === "string" ? (bells[icon] ?? null) : null;
+}
 function id(value: unknown, pattern: RegExp): string | null {
   return typeof value === "string" && pattern.test(value) ? value : null;
 }
@@ -179,6 +215,7 @@ export function normalize(raw: unknown, kind: Kind): Page {
       "richGridRenderer",
       "gridRenderer",
       "reelShelfRenderer",
+      "expandedShelfContentsRenderer",
       "playlistVideoListContinuation",
       "sectionListContinuation",
       "itemSectionContinuation",
@@ -215,6 +252,7 @@ export function normalize(raw: unknown, kind: Kind): Page {
     }
     if (n.richItemRenderer)
       return walk(object(n.richItemRenderer).content, group);
+    if (n.shelfRenderer) return walk(object(n.shelfRenderer).content, group);
     if (n.continuationItemRenderer || n.continuationItemViewModel) {
       recognized = true;
       setContinuation(
@@ -246,7 +284,21 @@ export function normalize(raw: unknown, kind: Kind): Page {
       object(lockup.metadata).lockupMetadataViewModel,
     );
     const lockupTitle = lockupMetadata.title;
-    if (kind === "playlists") {
+    if (kind === "channels") {
+      if (!n.channelRenderer) throw new SafeError("UPSTREAM_CHANGED");
+      const c = object(n.channelRenderer);
+      // YouTube now puts the handle in subscriberCountText and the size in videoCountText.
+      const handle = text(c.subscriberCountText);
+      const size = text(c.videoCountText);
+      page.items.push({
+        channel_id: id(c.channelId, /^UC[A-Za-z0-9_-]{22}$/),
+        title: text(c.title),
+        handle: handle?.startsWith("@") ? handle : null,
+        subscriber_count_text:
+          size && / subscribers?$/.test(size) ? size : null,
+        notification: notification(c),
+      });
+    } else if (kind === "playlists") {
       const p = object(n.gridPlaylistRenderer ?? n.playlistRenderer);
       // Saved courses are listed beside playlists and are addressed by a playlist ID.
       if (
