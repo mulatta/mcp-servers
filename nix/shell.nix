@@ -15,4 +15,8 @@ in
       pkgs.ruff
     ];
   };
+
+  youtube = pkgs.mkShell {
+    packages = [ pkgs.bun ];
+  };
 }
