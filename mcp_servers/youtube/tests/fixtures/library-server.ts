@@ -88,6 +88,7 @@ export function libraryServer(
         (_, i) => ({
           playlistVideoRenderer: {
             videoId: `v${String((offset + i) % 13).padStart(10, "0")}`,
+            setVideoId: `set-${offset + i}`,
             title: { simpleText: `Fixture ${offset + i}` },
             isPlayable: true,
           },

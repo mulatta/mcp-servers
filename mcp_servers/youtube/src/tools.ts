@@ -21,6 +21,8 @@ export const writeToolGroups = {
   youtube_delete_playlist: "playlist",
   youtube_add_to_playlist: "playlist",
   youtube_remove_from_playlist: "playlist",
+  youtube_update_playlist: "playlist",
+  youtube_move_in_playlist: "playlist",
 } as const satisfies Record<string, WriteGroup>;
 export type WriteToolName = keyof typeof writeToolGroups;
 export const writeToolNames = Object.keys(writeToolGroups) as WriteToolName[];

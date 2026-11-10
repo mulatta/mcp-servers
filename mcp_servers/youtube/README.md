@@ -120,6 +120,8 @@ flakelet module exposes the same list as `writes`.
 | `playlist` | `youtube_delete_playlist` | `playlist_id` (`PL…` only) | Yes |
 | `playlist` | `youtube_add_to_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | No |
 | `playlist` | `youtube_remove_from_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | Yes |
+| `playlist` | `youtube_update_playlist` | `playlist_id` (`PL…`), `title` and/or `description` | No |
+| `playlist` | `youtube_move_in_playlist` | `playlist_id` (`PL…` or `WL`), `video_id`, `after_video_id` | No |
 
 Write tools declare `readOnlyHint: false` and `idempotentHint: false`; deletes
 also declare `destructiveHint: true`. A write is sent once and never retried.
@@ -129,7 +131,11 @@ expected fields) returns `WRITE_OUTCOME_UNKNOWN`: read the target before trying
 again. Diagnostics record the tool and outcome, never the IDs or titles.
 Adding and removing send one `browse/edit_playlist` request with an action per
 video; removal is by video ID, so the playlist is not read first. An edit
-counts as done only when YouTube answers `STATUS_SUCCEEDED`.
+counts as done only when YouTube answers `STATUS_SUCCEEDED`. A move needs
+each entry's set ID, so it first reads the playlist to its end, at most 60
+pages; it refuses with `PLAYLIST_ITEM_NOT_FOUND`, `PLAYLIST_ITEM_AMBIGUOUS` (a
+video listed twice) or `PLAYLIST_TOO_LONG` before sending anything. Moving to
+the very top is not supported.
 
 Example MCP call arguments:
 

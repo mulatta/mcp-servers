@@ -1,5 +1,16 @@
 # Verification record
 
+## Approved live playlist update and move check: 2026-11-10
+
+In a new private playlist holding three public uploads, renaming (with a
+description) showed the new title in `youtube_list_playlists` after about
+0.2 s, and moving the first video after the third gave the expected order
+after about 2.3 s; the playlist was then deleted. In Watch Later (2,177
+entries) the sixth entry was moved two places down (visible after about
+11.1 s) and then back after its original predecessor; after about 11.9 s the
+whole list matched its original order. Every write returned success; only
+flags and timings were printed.
+
 ## Approved live playlist edit check: 2026-11-10
 
 With `YOUTUBE_WRITES=playlist`, two public uploads from a subscribed channel

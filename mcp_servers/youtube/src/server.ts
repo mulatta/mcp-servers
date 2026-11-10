@@ -111,7 +111,9 @@ export function createServer(
         name,
         {
           description: definition.description,
-          inputSchema: z.strictObject(definition.input),
+          inputSchema: z
+            .strictObject(definition.input)
+            .refine(definition.check ?? (() => true)),
           annotations: {
             readOnlyHint: false,
             destructiveHint: definition.destructive,
@@ -153,14 +155,20 @@ const editablePlaylist = z
   .string()
   .refine((id) => id === "WL" || userPlaylistId.test(id));
 // A repeated ID would add the video twice, which is rarely what a caller meant.
+const videoId = z.string().regex(/^[A-Za-z0-9_-]{11}$/);
 const videoBatch = z
-  .array(z.string().regex(/^[A-Za-z0-9_-]{11}$/))
+  .array(videoId)
   .min(1)
   .max(50)
   .refine((ids) => new Set(ids).size === ids.length);
 const writeTools: Record<
   WriteToolName,
-  { description: string; input: z.ZodRawShape; destructive: boolean }
+  {
+    description: string;
+    input: z.ZodRawShape;
+    destructive: boolean;
+    check?: (input: Record<string, unknown>) => boolean;
+  }
 > = {
   youtube_create_playlist: {
     description:
@@ -189,5 +197,28 @@ const writeTools: Record<
       "Remove up to 50 videos from one of the account's playlists or from Watch Later (WL).",
     input: { playlist_id: editablePlaylist, video_ids: videoBatch },
     destructive: true,
+  },
+  youtube_update_playlist: {
+    description:
+      "Change the title and/or description of one of the account's PL playlists.",
+    input: {
+      playlist_id: z.string().regex(userPlaylistId),
+      title: z.string().min(1).max(150).optional(),
+      description: z.string().max(5000).optional(),
+    },
+    destructive: false,
+    check: (input) =>
+      input.title !== undefined || input.description !== undefined,
+  },
+  youtube_move_in_playlist: {
+    description:
+      "Move a video so it follows another video in a PL playlist or Watch Later (WL).",
+    input: {
+      playlist_id: editablePlaylist,
+      video_id: videoId,
+      after_video_id: videoId,
+    },
+    destructive: false,
+    check: (input) => input.video_id !== input.after_video_id,
   },
 };

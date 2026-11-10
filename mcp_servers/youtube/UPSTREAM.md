@@ -41,6 +41,13 @@ was accessed for this inspection.
   creation posts the `CreatePlaylistServiceEndpoint` body (`title`,
   `privacyStatus`, `videoIds`, `description`) to `playlist/create` the same way,
   so both writes are visible in one place.
+- `PlaylistManager.setName()` in 18.3.0 builds its payload with `playlist_id`,
+  which `PlaylistEditEndpoint.buildRequest()` ignores, so no playlist is named
+  in the request. The update tool posts `ACTION_SET_PLAYLIST_NAME` and
+  `ACTION_SET_PLAYLIST_DESCRIPTION` with `playlistId` to `browse/edit_playlist`.
+  Moves send `ACTION_MOVE_VIDEO_AFTER` with the entries' `setVideoId`s, read
+  from `playlistVideoRenderer` items as `moveVideo()` does, but over a bounded,
+  complete read so a duplicate entry is detected.
 - `account.getInfo(true)` lists accounts using WEB and has `is_selected`, but
   `AccountItem` does not expose a stable channel ID as a dedicated field. Do not
   execute switch-account service endpoints to derive identity.
