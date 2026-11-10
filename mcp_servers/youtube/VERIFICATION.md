@@ -1,5 +1,14 @@
 # Verification record
 
+## Approved live rating check: 2026-11-10
+
+With `YOUTUBE_WRITES=rating`, a public upload absent from the account's 3,128
+liked videos was liked (returned `rating: like`, at the top of liked videos
+after about 3.0 s) and its rating removed (gone after about 5.5 s). Afterwards
+the full liked list matched the original entries and order. Two earlier
+key-only probes established the request body and the `likeStatusEntity`
+confirmation and also restored the original state.
+
 ## Approved live playlist update and move check: 2026-11-10
 
 In a new private playlist holding three public uploads, renaming (with a

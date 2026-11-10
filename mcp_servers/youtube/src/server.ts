@@ -221,4 +221,15 @@ const writeTools: Record<
     destructive: false,
     check: (input) => input.video_id !== input.after_video_id,
   },
+  youtube_like_video: {
+    description: "Like a video on the authenticated account.",
+    input: { video_id: videoId },
+    destructive: false,
+  },
+  youtube_remove_rating: {
+    description:
+      "Remove the authenticated account's like or dislike from a video.",
+    input: { video_id: videoId },
+    destructive: true,
+  },
 };

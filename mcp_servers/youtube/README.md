@@ -122,6 +122,8 @@ flakelet module exposes the same list as `writes`.
 | `playlist` | `youtube_remove_from_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | Yes |
 | `playlist` | `youtube_update_playlist` | `playlist_id` (`PL…`), `title` and/or `description` | No |
 | `playlist` | `youtube_move_in_playlist` | `playlist_id` (`PL…` or `WL`), `video_id`, `after_video_id` | No |
+| `rating` | `youtube_like_video` | `video_id` | No |
+| `rating` | `youtube_remove_rating` | `video_id` | Yes |
 
 Write tools declare `readOnlyHint: false` and `idempotentHint: false`; deletes
 also declare `destructiveHint: true`. A write is sent once and never retried.
@@ -135,7 +137,9 @@ counts as done only when YouTube answers `STATUS_SUCCEEDED`. A move needs
 each entry's set ID, so it first reads the playlist to its end, at most 60
 pages; it refuses with `PLAYLIST_ITEM_NOT_FOUND`, `PLAYLIST_ITEM_AMBIGUOUS` (a
 video listed twice) or `PLAYLIST_TOO_LONG` before sending anything. Moving to
-the very top is not supported.
+the very top is not supported. A rating counts as done only when YouTube
+returns the video's new like status (`LIKE`, or `INDIFFERENT` after removal);
+there is no dislike tool.
 
 Example MCP call arguments:
 

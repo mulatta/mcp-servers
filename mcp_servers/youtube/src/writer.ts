@@ -93,6 +93,15 @@ const operations: Record<WriteToolName, Operation> = {
     "ACTION_REMOVE_VIDEO_BY_VIDEO_ID",
     "removedVideoId",
   ),
+  // YouTube.js sends ratings as the TV client with a bare target string; the
+  // session here is WEB, so the web body `{ target: { videoId } }` is used.
+  youtube_like_video: rate("like", "/like/like", "LIKE", "like"),
+  youtube_remove_rating: rate(
+    "remove_like",
+    "/like/removelike",
+    "INDIFFERENT",
+    "none",
+  ),
   // YouTube.js 18.3.0 setName() sends `playlist_id` instead of `playlistId`,
   // so the edit body is built here for both fields.
   youtube_update_playlist: {
@@ -149,6 +158,37 @@ const operations: Record<WriteToolName, Operation> = {
     },
   },
 };
+
+// YouTube answers a rating with the video's new likeStatusEntity.
+function rate(
+  route: Route,
+  path: string,
+  expected: "LIKE" | "INDIFFERENT",
+  rating: "like" | "none",
+): Operation {
+  return {
+    routes: [route],
+    path,
+    body: (input) => ({ target: { videoId: input.video_id } }),
+    result: (data, input) => {
+      const updates = (data.frameworkUpdates ?? {}) as Record<string, unknown>;
+      const batch = (updates.entityBatchUpdate ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const mutations = Array.isArray(batch.mutations) ? batch.mutations : [];
+      const confirmed = mutations.some((mutation) => {
+        const payload = (mutation as { payload?: Record<string, unknown> })
+          .payload;
+        const entity = payload?.likeStatusEntity as
+          Record<string, unknown> | undefined;
+        return entity?.likeStatus === expected;
+      });
+      if (!confirmed) throw new SafeError("WRITE_OUTCOME_UNKNOWN");
+      return { video_id: input.video_id, rating };
+    },
+  };
+}
 
 function succeeded(data: Record<string, unknown>) {
   if (data.status !== "STATUS_SUCCEEDED")

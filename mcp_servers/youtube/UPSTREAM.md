@@ -48,6 +48,11 @@ was accessed for this inspection.
   Moves send `ACTION_MOVE_VIDEO_AFTER` with the entries' `setVideoId`s, read
   from `playlistVideoRenderer` items as `moveVideo()` does, but over a bounded,
   complete read so a duplicate entry is detected.
+- `InteractionManager.like()`/`removeRating()` send a `LikeEndpoint` with a
+  bare `target` string as the TV client. This session is WEB, and a live check
+  confirmed the web body `{ target: { videoId } }` on `like/like` and
+  `like/removelike`; both answer with a `frameworkUpdates.entityBatchUpdate`
+  mutation whose `likeStatusEntity.likeStatus` is `LIKE` or `INDIFFERENT`.
 - `account.getInfo(true)` lists accounts using WEB and has `is_selected`, but
   `AccountItem` does not expose a stable channel ID as a dedicated field. Do not
   execute switch-account service endpoints to derive identity.
