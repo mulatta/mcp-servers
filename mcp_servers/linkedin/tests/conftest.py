@@ -10,7 +10,9 @@ import pytest_asyncio
 
 
 @pytest_asyncio.fixture
-async def chromium(tmp_path: Path) -> AsyncIterator[tuple[str, str]]:
+async def chromium(
+    tmp_path: Path, request: pytest.FixtureRequest
+) -> AsyncIterator[tuple[str, str]]:
     # Shared browsers are opt-in and never started or stopped by this fixture.
     endpoint = os.environ.get("TEST_CDP_URL")
     if endpoint:
@@ -32,6 +34,7 @@ async def chromium(tmp_path: Path) -> AsyncIterator[tuple[str, str]]:
         f"--user-data-dir={tmp_path / 'profile'}",
         "--no-first-run",
         "--no-default-browser-check",
+        *getattr(request, "param", ()),
         "about:blank",
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.PIPE,
