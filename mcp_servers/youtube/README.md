@@ -1,14 +1,17 @@
 # YouTube MCP
 
-Read-only YouTube MCP server using Bun and TypeScript.
+MCP server for one YouTube account, written in Bun and TypeScript. It reads the
+account's library and, when enabled per group, changes playlists, ratings,
+subscriptions and notification bells. Authentication comes from a signed-in
+Chromium browser over CDP; cookies stay in process memory. The server speaks
+MCP over stdio or authenticated HTTP.
 
-Read-only tools are connected to the CDP session provider, YouTube.js
-adapter, normalization, and bounded pagination. The server speaks MCP over
-stdio or authenticated HTTP. Discovery is credential free; actual reads
-authenticate lazily. Local integration tests pass. Approved live checks over
-both transports returned five items from each of the first five tools on one
-account; tools added later await their own approved live check;
-see [VERIFICATION.md](VERIFICATION.md) for scope and remaining limits.
+- Reads are always available. Writes are off unless `YOUTUBE_WRITES` names
+  their group.
+- Every tool, read and write, has been checked against a live account; see
+  [Verification status](#verification-status) for what that covers.
+- [UPSTREAM.md](UPSTREAM.md) records the YouTube and YouTube.js behaviour the
+  server depends on, including two YouTube.js defects it works around.
 
 ## Development
 
@@ -18,35 +21,46 @@ From the repository root:
 nix develop .#youtube
 cd mcp_servers/youtube
 bun install --frozen-lockfile
-bun run check
+bun run check   # typecheck and Prettier
+bun run test    # protocol suite, no browser or account
 ```
 
 `bun run format` formats TypeScript and JSON in this package. Run `nix fmt`
 from the repository root for Markdown and the other repository formats.
-Markdown has one formatter (mdformat), so Prettier does not rewrite it.
-TypeScript is checked separately with
-`bun run typecheck`; Bun execution alone does not type-check TypeScript.
-Runtime and development dependencies are pinned in `package.json` and `bun.lock`.
-`nix develop` and `nix develop .#youtube` provide the same Bun shell.
+Markdown has one formatter (mdformat), so Prettier does not rewrite it. Bun
+execution alone does not type-check TypeScript. Dependencies are pinned in
+`package.json` and `bun.lock`. `nix develop` and `nix develop .#youtube`
+provide the same Bun shell. Nix packaging lives in `nix/youtube.nix`; the
+flakelet service module in `nix/flakelet-youtube.nix`.
 
-## Run over stdio
+## Configuration
 
-From `mcp_servers/youtube`, run:
+| Variable | Default | Meaning |
+| ---------------------------- | ----------------------- | ------------------------------------------------------------- |
+| `YOUTUBE_CDP_URL` | `http://127.0.0.1:9222` | CDP endpoint of the signed-in browser |
+| `YOUTUBE_WRITES` | unset (read-only) | Write groups to expose, see [Writes](#writes) |
+| `YOUTUBE_LOG_LEVEL` | `info` | `error`, `warn`, `info` or `debug` |
+| `YOUTUBE_TRANSPORT` | `stdio` | `stdio` or `http` |
+| `YOUTUBE_HTTP_PORT` | required for HTTP | TCP port, 1–65535 |
+| `YOUTUBE_HTTP_TOKEN_FILE` | required for HTTP | File holding the bearer token on one line |
+| `YOUTUBE_HTTP_HOST` | `127.0.0.1` | Listen address |
+| `YOUTUBE_HTTP_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated hostnames accepted in `Host` |
 
-```sh
-bun run start
-```
+Any invalid value logs `config.invalid` with a fixed code
+(`INVALID_LOG_LEVEL`, `INVALID_TRANSPORT`, `INVALID_HTTP_CONFIG`,
+`INVALID_WRITES`) and exits 1 before serving or contacting the browser.
+`server.start` lists the enabled write groups. The flakelet module exposes the
+same settings as `listenAddress`, `port`, `allowedHosts`, `tokenFile`,
+`cdpUrl`, `logLevel` and `writes`.
 
-Connect an MCP client rather than typing interactive commands. Configure the
-client command as `bun`, arguments as `run src/index.ts`, and working directory
-as the absolute path to `mcp_servers/youtube`. Stdout contains only MCP protocol
-messages; diagnostics must go to stderr without session details.
+### Run over stdio
 
-Tool discovery does not require a running browser or credentials.
+From `mcp_servers/youtube`, run `bun run start`. Configure an MCP client with
+command `bun`, arguments `run src/index.ts`, and the absolute path of
+`mcp_servers/youtube` as working directory. Stdout carries only MCP messages;
+diagnostics go to stderr. Tool discovery needs no browser or credentials.
 
-## Run over HTTP
-
-Set `YOUTUBE_TRANSPORT=http` to serve stateless Streamable HTTP at `/mcp`:
+### Run over HTTP
 
 ```sh
 YOUTUBE_TRANSPORT=http \
@@ -55,29 +69,22 @@ YOUTUBE_HTTP_TOKEN_FILE=/run/credentials/youtube-mcp/token \
 bun run start
 ```
 
-| Variable | Default | Meaning |
-| ---------------------------- | --------------------- | -------------------------------------------- |
-| `YOUTUBE_HTTP_PORT` | required | TCP port, 1–65535 |
-| `YOUTUBE_HTTP_TOKEN_FILE` | required | File holding the bearer token on one line |
-| `YOUTUBE_HTTP_HOST` | `127.0.0.1` | Listen address |
-| `YOUTUBE_HTTP_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated hostnames accepted in `Host` |
-
-The token must be at least 32 visible ASCII characters with no whitespace;
-one trailing newline is ignored. Generate it with `openssl rand -hex 32`.
-Invalid or incomplete configuration logs `config.invalid` and exits 1 before
-listening.
+The server answers stateless Streamable HTTP at `/mcp`. The token must be at
+least 32 visible ASCII characters with no whitespace; one trailing newline is
+ignored. Generate it with `openssl rand -hex 32`.
 
 Each request is checked in this order: `Host` hostname against the allowlist
 (403), `Authorization: Bearer` with a constant-time comparison (401), path
 `/mcp` (404), and method `POST` (405). Rejections log `http.rejected` with the
-status only. `Host` is matched by hostname without the port, so a reverse
-proxy that keeps the original host passes unchanged. Keep the listener on
-loopback and put TLS in front; the server itself speaks plain HTTP.
+status only. `Host` is matched by hostname without the port; repeated
+spellings of one host are accepted, malformed entries refuse to start. Keep
+the listener on loopback and put TLS in front; the server speaks plain HTTP.
 
-Every request gets a fresh MCP server, and all requests share one reader, so
-concurrent clients share one browser refresh and one cursor store. Cursors
-work across clients but compete for the same 128-entry limit, and an
-authentication failure in any request expires every outstanding cursor.
+Every request gets a fresh MCP server; all requests share one browser session,
+so concurrent clients share one refresh and one cursor store. Cursors work
+across clients but compete for the same 128-entry limit, and an authentication
+failure in any request expires every outstanding cursor. A client that
+disconnects cancels its request.
 
 Client configuration (Claude Code):
 
@@ -89,276 +96,290 @@ Client configuration (Claude Code):
 }
 ```
 
-## Tools
+## Read tools
 
-| Tool | Purpose | Required input |
-| --------------------------- | ----------------- | -------------- |
+| Tool | Returns | Required input |
+| ---------------------------- | ---------------------------------- | -------------- |
 | `youtube_list_playlists` | Account playlists | None |
 | `youtube_get_playlist` | Playlist contents | `playlist_id` |
 | `youtube_get_watch_later` | Watch Later | None |
 | `youtube_get_liked_videos` | Liked videos | None |
 | `youtube_get_watch_history` | Watch history | None |
-| `youtube_list_subscriptions` | Subscribed channels | None |
+| `youtube_list_subscriptions` | Subscribed channels and their bell | None |
 | `youtube_get_channel_videos` | A channel's uploads, newest first | `channel_id` |
 
-All tools accept optional `limit` (integer 1–100, default 50) and `cursor`.
-Playlist IDs contain letters, digits, `_`, or `-`; URLs are not accepted.
-Channel IDs are `UC` plus 22 such characters; handles and URLs are not accepted.
-Unknown arguments are rejected before backend access. All tools declare
-read-only, non-destructive annotations. No write or arbitrary API tools exist.
+All read tools take optional `limit` (1–100, default 50) and `cursor`, and
+declare read-only, non-destructive annotations. Playlist IDs contain letters,
+digits, `_` or `-`; channel IDs are `UC` plus 22 such characters. URLs and
+handles are not accepted, and unknown arguments are rejected before any
+request.
 
-`YOUTUBE_WRITES` selects write tool groups: a comma-separated subset of
-`playlist`, `rating`, `subscription` and `notification`, or `all` on its own.
-Unset or empty keeps the server read-only. Any other value, including `all`
-beside a group name, refuses to start with `INVALID_WRITES`, so a typo cannot
-silently enable or drop a group. `server.start` lists the enabled groups. The
-flakelet module exposes the same list as `writes`.
+```json
+{ "name": "youtube_get_playlist", "arguments": { "playlist_id": "WL", "limit": 20 } }
+```
+
+### Results
+
+[Validated examples](examples/results.json) cover every read tool. Successful
+responses carry identical JSON in `structuredContent` and the text block:
+
+- `account_id`: the verified, pinned channel ID of the account.
+- `items`: ordered summaries, including repeats and explicit placeholders.
+- `next_cursor`: opaque in-process cursor or `null`; `has_more` mirrors it.
+
+| Tool | Item fields |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| `youtube_list_playlists` | `playlist_id`, `title`, `video_count` |
+| video lists | `video_id`, `title`, `url`, `channel_name`, `availability`, `watched_percent`, `duration_seconds` |
+| `youtube_get_watch_history` | video fields plus `watched_at`, `group_label` |
+| `youtube_get_channel_videos` | video fields plus `published_text`; `channel_name` is `null` |
+| `youtube_list_subscriptions` | `channel_id`, `title`, `handle`, `subscriber_count_text`, `notification` |
+
+- `availability`: `available`, `private`, `deleted`, `unavailable` or `null`.
+- `watched_percent`: the 0–100 progress shown on the thumbnail, or `null` when
+  none is shown (unwatched or unknown; never `0`).
+- `duration_seconds`: from the exact length or an `H:MM:SS`/`M:SS` label; live
+  streams, Shorts and anything that is not an exact clock report `null`.
+- `watched_at` is always `null`: history carries no exact timestamps.
+  Relative labels such as `Today` stay in `group_label`.
+- `published_text`: YouTube's relative upload label, such as `2 days ago`.
+- `handle` is the `@name`; `subscriber_count_text` is shown as YouTube displays
+  it; `notification` is `all`, `personalized` or `none`, read from the icon of
+  the channel's current bell state.
+
+Unknown values are `null`, never guessed from display text. Explicit private
+or deleted entries stay in the list. YouTube may hide unavailable items; this
+server cannot recover them. An unsupported response is an error, not an empty
+success. An unknown or removed channel ID has no verified response shape and
+fails as an upstream error.
+
+### Pagination
+
+Use [examples/walk.ts](examples/walk.ts) with an initialized MCP SDK client:
+
+```ts
+for await (const page of walk(client, "youtube_get_watch_later", { limit: 20 })) {
+  consume(page.items);
+}
+```
+
+Keep tool, target ID and limit unchanged when passing `next_cursor`. Replaying a
+still-valid cursor returns the same page. Empty `items` with a non-null cursor
+is valid: follow the cursor. The server makes at most three additional upstream
+requests per page.
+
+Cursors last at most five minutes and exist only in this process, limited to
+128 cursors and 16 MiB of retained data, evicted by LRU. Session refresh,
+restart and eviction produce `CURSOR_EXPIRED`: discard the partial result and
+start without a cursor. This is not a snapshot; concurrent edits may reorder
+entries between pages.
+
+## Writes
+
+`YOUTUBE_WRITES` is a comma-separated subset of `playlist`, `rating`,
+`subscription` and `notification`, or `all` on its own. Unset or empty keeps
+the server read-only. Anything else, including `all` beside a group name,
+refuses to start with `INVALID_WRITES`, so a typo cannot silently enable or
+drop a group. A tool whose group is off is neither listed nor callable.
 
 | Group | Tool | Input | Destructive |
-| ---------- | ------------------------- | ------------------------------------------------------- | ----------- |
-| `playlist` | `youtube_create_playlist` | `title`, optional `privacy` (default `PRIVATE`), `description` | No |
-| `playlist` | `youtube_delete_playlist` | `playlist_id` (`PL…` only) | Yes |
+| -------------- | ----------------------------------- | -------------------------------------------------------------------- | ----------- |
+| `playlist` | `youtube_create_playlist` | `title` (1–150), optional `privacy` (`PRIVATE` default, `UNLISTED`, `PUBLIC`), `description` (≤5000) | No |
+| `playlist` | `youtube_delete_playlist` | `playlist_id` (`PL…`) | Yes |
 | `playlist` | `youtube_add_to_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | No |
 | `playlist` | `youtube_remove_from_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | Yes |
 | `playlist` | `youtube_update_playlist` | `playlist_id` (`PL…`), `title` and/or `description` | No |
 | `playlist` | `youtube_move_in_playlist` | `playlist_id` (`PL…` or `WL`), `video_id`, `after_video_id` | No |
 | `rating` | `youtube_like_video` | `video_id` | No |
 | `rating` | `youtube_remove_rating` | `video_id` | Yes |
-| `subscription` | `youtube_subscribe` | `channel_id` (`UC…`) | No |
-| `subscription` | `youtube_unsubscribe` | `channel_id` (`UC…`) | Yes |
-| `notification` | `youtube_set_channel_notifications` | `channel_id` (`UC…`), `setting` (`all`, `personalized`, `none`) | No |
+| `subscription` | `youtube_subscribe` | `channel_id` | No |
+| `subscription` | `youtube_unsubscribe` | `channel_id` | Yes |
+| `notification` | `youtube_set_channel_notifications` | `channel_id`, `setting` (`all`, `personalized`, `none`) | No |
 
-Write tools declare `readOnlyHint: false` and `idempotentHint: false`; deletes
-also declare `destructiveHint: true`. A write is sent once and never retried.
-If it was sent and YouTube did not refuse it with a client error, any later
-failure (timeout, dropped connection, server error, or a response without the
-expected fields) returns `WRITE_OUTCOME_UNKNOWN`: read the target before trying
-again. Diagnostics record the tool and outcome, never the IDs or titles.
-Adding and removing send one `browse/edit_playlist` request with an action per
-video; removal is by video ID, so the playlist is not read first. An edit
-counts as done only when YouTube answers `STATUS_SUCCEEDED`. A move needs
-each entry's set ID, so it first reads the playlist to its end, at most 60
-pages; it refuses with `PLAYLIST_ITEM_NOT_FOUND`, `PLAYLIST_ITEM_AMBIGUOUS` (a
-video listed twice) or `PLAYLIST_TOO_LONG` before sending anything. Moving to
-the very top is not supported. A rating counts as done only when YouTube
-returns the video's new like status (`LIKE`, or `INDIFFERENT` after removal);
-there is no dislike tool. A subscription change counts as done only when
-YouTube's subscribe-button update names the channel with the requested state.
-A bell change first finds the channel in the subscription list (refusing with
-`CHANNEL_NOT_SUBSCRIBED` before any write) and posts the params YouTube offers
-in that channel's bell menu; it counts as done only when YouTube returns the
-matching notification state.
+Liked videos (`LL`), mixes and uploads lists are not editable as playlists;
+likes change through the rating tools. There are no dislike, comment or
+privacy-change tools.
 
-Example MCP call arguments:
+### How a write behaves
 
-```json
-{
-  "name": "youtube_get_playlist",
-  "arguments": { "playlist_id": "WL", "limit": 20 }
-}
-```
+- **Sent once.** A write is never retried, not even after an authentication
+  failure, and every write uses the same pinned account as reads.
 
-Execution failures use `isError: true` with a text content block containing
-JSON with safe `code` and `message` fields. Raw upstream exceptions are never
-returned. Client cancellation aborts the operation; requests exceeding 30
-seconds return `TIMEOUT` and abort their backend signal.
+- **Confirmed by YouTube's answer, not by the HTTP status.** A write succeeds
+  only when the response proves the requested change:
 
-## Results
+  | Tool | Required in the response |
+  | ------------------------------------ | ----------------------------------------------------------------- |
+  | create | a new `PL` playlist ID |
+  | add, remove, update, move | `status: STATUS_SUCCEEDED` |
+  | like, remove rating | the video's new like status, `LIKE` or `INDIFFERENT` |
+  | subscribe, unsubscribe | a subscribe-button update for that channel with the new state |
+  | notification bell | the channel's new notification state |
+  | delete | a successful response (YouTube returns no further detail) |
 
-[Validated examples](examples/results.json) cover every tool. Successful
-responses contain identical JSON in `structuredContent` and text content:
+- **`WRITE_OUTCOME_UNKNOWN`.** If a write was sent and YouTube did not refuse
+  it with a 4xx status, any other ending (timeout, client cancellation,
+  dropped connection, 5xx, or an answer without the confirmation above) is
+  reported as unknown. The change may have happened: read the target before
+  trying again.
 
-- `account_id`: verified, pinned channel ID, not a display name or email.
-- `items`: ordered summaries, including repeats and explicit placeholders.
-- `next_cursor`: opaque in-process cursor or `null`.
-- `has_more`: whether `next_cursor` is non-null.
+- **Checked before sending.** A move first reads the whole playlist (at most 60
+  pages) to find each entry's set ID and refuses with
+  `PLAYLIST_ITEM_NOT_FOUND`, `PLAYLIST_ITEM_AMBIGUOUS` (the video is listed more
+  than once) or `PLAYLIST_TOO_LONG` without sending anything. A bell change
+  first finds the channel in the subscription list and refuses with
+  `CHANNEL_NOT_SUBSCRIBED`; it then posts the params YouTube offers in that
+  channel's own bell menu.
 
-`youtube_list_playlists` returns `playlist_id`, `title`, and `video_count`.
-All other tools return `video_id`, `title`, `url`, `channel_name`, and
-`availability` (`available`, `private`, `deleted`, `unavailable`, or `null`),
-and `watched_percent`: the 0–100 progress YouTube shows on the thumbnail, or
-`null` when it shows none (unwatched or unknown; never reported as `0`), and
-`duration_seconds`, read from the exact length or a `H:MM:SS`/`M:SS` label;
-live streams, Shorts and anything else that is not an exact clock report `null`.
-`youtube_get_watch_history` additionally returns `watched_at` and `group_label`.
-`youtube_list_subscriptions` returns `channel_id`, `title`, `handle` (`@name`),
-`subscriber_count_text` as YouTube displays it, and `notification` (`all`,
-`personalized`, or `none`), the bell setting read from the icon of the
-channel's current notification state.
-`youtube_get_channel_videos` returns the video fields with `channel_name` set to
-`null` (the channel is the requested one) plus `published_text`, YouTube's
-relative upload label such as `2 days ago`. An unknown or removed channel ID
-has no verified response shape yet and fails as an upstream error.
-Current supported history structures do not provide exact watch timestamps:
-`watched_at` is `null`. Relative labels such as `Today` stay in `group_label`.
+- **Removal is by video ID** and removes every entry of that video in the
+  playlist, including duplicates. Moving to the very top is not supported:
+  name the video it should follow.
 
-Unknown values are `null`, never guessed from display text. Explicit private
-or deleted entries remain in the list. YouTube may hide unavailable items
-entirely; this server cannot recover them or promise a complete archive.
-An unsupported response is an error, not an empty success.
+- **Results** name the target and the new state, for example
+  `{ "account_id", "playlist_id", "video_ids" }` or
+  `{ "account_id", "channel_id", "notification" }`.
 
-## Pagination
+### Read-after-write delay
 
-Use [examples/walk.ts](examples/walk.ts) with an initialized MCP SDK client:
+YouTube applies a confirmed write before its lists show it. Observed delays
+until a read reflected the change:
 
-```ts
-for await (const page of walk(client, "youtube_get_watch_later", {
-  limit: 20,
-})) {
-  consume(page.items);
-}
-```
+| Change | Delay |
+| ------------------------------------------------------ | ------------ |
+| playlist created, renamed or edited (ordinary playlist) | about 0.2–3.5 s |
+| Watch Later add, remove or move | about 11–16 s |
+| like or rating removed, in liked videos | about 3–6 s |
+| subscribe, unsubscribe, bell, in subscriptions | about 6 s |
 
-This is explicit client-side iteration, not automatic server-side traversal.
-Keep tool, playlist ID, and limit unchanged when passing `next_cursor`.
-Replaying a still-valid cursor returns the same page. Empty `items` with a
-non-null cursor is valid: follow that cursor instead of assuming completion.
-The server makes at most three additional upstream requests per page.
+A newly created playlist may briefly read as `PLAYLIST_UNAVAILABLE`, then as
+empty.
 
-Cursors last at most five minutes and exist only in this process. State is
-limited to 128 cursors and 16 MiB of serialized retained data, evicted by LRU.
-Session refresh, restart, and eviction produce `CURSOR_EXPIRED`. Discard the
-incomplete accumulation and start without a cursor; never silently append a
-restarted traversal to old results. `examples/walk.ts` surfaces expiry rather
-than automatically restarting. The local MCP fixture test runs both traversal
-and explicit recovery.
+## Errors
 
-This is not an immutable snapshot. Browser/account changes can invalidate
-cursors, and concurrent YouTube edits may change ordering between requests.
-The server preserves duplicates and source order; it cannot repair remote
-changes or reconstruct entries YouTube never returned.
+Failures return `isError: true` with a text block holding JSON
+`{ "code", "message" }`. Raw upstream errors are never returned. Requests
+running past 30 seconds return `TIMEOUT` (writes: `WRITE_OUTCOME_UNKNOWN` once
+sent).
 
-## Tests
-
-```sh
-bun run test
-```
-
-The protocol suite starts a real Bun subprocess and MCP client to check
-initialization, discovery, error responses, and shutdown without a browser.
-In-process MCP sessions exercise schema rejection, secret-safe errors,
-deadlines, and cancellation. HTTP tests cover every fail-closed path
-(credentials, Host, path, method, configuration) and check that concurrent
-clients share one browser refresh and cursor computation. These tests do not access a personal account.
+| Code | Meaning and what to do |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| `BROWSER_UNAVAILABLE` | CDP is unreachable or has no default-context page. Check the browser. |
+| `AUTH_REQUIRED` | Not signed in, or YouTube refused the session. Sign in in the browser. |
+| `ACCOUNT_CHANGED` | The browser now holds another account. Confirm it and restart the server. |
+| `CURSOR_INVALID` | The cursor does not belong to this tool, target and limit. |
+| `CURSOR_EXPIRED` | The cursor's session ended. Start again without a cursor. |
+| `PLAYLIST_UNAVAILABLE` | The playlist does not exist or this account cannot use it. |
+| `PLAYLIST_ITEM_NOT_FOUND` | A video to move is not in the playlist. Nothing was sent. |
+| `PLAYLIST_ITEM_AMBIGUOUS` | A video to move is listed twice. Nothing was sent. |
+| `PLAYLIST_TOO_LONG` | The playlist exceeds 60 pages for a move. Nothing was sent. |
+| `CHANNEL_NOT_SUBSCRIBED` | A bell change for a channel the account does not follow. Nothing was sent. |
+| `RATE_LIMITED` | YouTube rate limited the request. Wait. |
+| `UPSTREAM_BLOCKED` | YouTube asked for a bot check. Stop and check the browser. |
+| `UPSTREAM_CHANGED` | YouTube answered in a shape this server does not support. |
+| `UPSTREAM_UNAVAILABLE` | YouTube or the network failed, or the request was cancelled before sending. |
+| `TIMEOUT` | A read took longer than 30 seconds. |
+| `WRITE_OUTCOME_UNKNOWN` | A sent write may or may not have applied. Read the target before retrying. |
 
 ## Browser session boundary
 
-Authentication is lazy: the first read acquires
-cookies from an existing page in the browser's default context over CDP.
-Only cookies applicable to `https://www.youtube.com/` enter the in-memory
-YouTube.js session. No cookie file, profile database, or disk authentication
-cache is used. HttpOnly cookies are supported without executing page JavaScript.
+Authentication is lazy: the first call reads cookies from an existing page in
+the browser's default context over CDP. Only cookies applicable to
+`https://www.youtube.com/` enter the in-memory YouTube.js session. No cookie
+file, profile database or disk cache is used, and no page JavaScript runs.
 
-Operator configuration:
+Only HTTP(S) CDP origins are accepted; credentials, path prefixes, query
+strings and fragments are rejected. Tools cannot override the endpoint. CDP
+discovery redirects are rejected and the WebSocket authority is checked. Run
+the server on the browser's host so CDP stays on loopback, or reach a remote
+browser through an operator-managed SSH tunnel. Never expose CDP: it grants
+full control of the browser.
 
-```sh
-YOUTUBE_CDP_URL=http://127.0.0.1:9222 bun run start
-```
+On `AUTH_REQUIRED`, sign into the intended YouTube account in the browser and
+keep a default-context page open. There is no automatic login, tab creation,
+navigation or account switching. A stable channel ID must be readable; missing
+or ambiguous identity fails closed. Snapshots last at most five minutes; a
+clear authentication failure on a read causes at most one reacquisition.
 
-Only HTTP(S) origins are accepted; credentials, path prefixes, query strings,
-and fragments are rejected. Tools cannot override the endpoint. CDP discovery
-redirects are rejected and WebSocket authority is checked. See [UPSTREAM.md](UPSTREAM.md).
+Every authenticated request names the routes it may reach, and the transport
+compares the whole request path against them: reads may reach only `browse`,
+and each write tool only its own route (plus `browse` for the reads a move or
+bell change needs). Requests to any other path never leave the process.
+Cookie strings and client objects live only in process memory; JavaScript
+cannot guarantee zeroization, so protect process memory and core dumps with
+deployment controls. CDP and Google cookies grant more than this server's
+tools; restricting the tools does not reduce those privileges.
 
-Any Chromium-based browser with remote debugging enabled works. Run the
-server on the browser's host so CDP stays on loopback, or reach a remote
-browser through an operator-managed SSH tunnel. This package does not create
-tunnels, change firewall rules, or manage the browser; the HTTP listener is
-the only port it opens. Never expose CDP publicly: it grants full control of
-the browser, not only cookie reads.
+## Tests and live checks
 
-On `AUTH_REQUIRED`, open the browser manually and sign into the intended default
-YouTube account. Keep an existing default-context page open. There is no
-automatic login, tab creation, navigation, or account switching. A stable
-channel ID must be readable; missing/ambiguous identity fails closed.
+`bun run test` runs the protocol suite against local fixtures: a real Bun
+subprocess and MCP client for discovery and shutdown, in-process sessions for
+schema rejection, errors, deadlines and cancellation, HTTP fail-closed paths,
+and every write tool's input checks, request bodies, confirmation rules and
+`WRITE_OUTCOME_UNKNOWN` paths. No test touches a browser or account. The flake
+checks also build the package with tests, the flakelet units, and a NixOS VM
+test of the HTTP service.
 
-Snapshots last at most five minutes. Concurrent acquisition is shared; a clear
-authentication failure causes at most one reacquisition and first-page retry.
-A changed account permanently yields `ACCOUNT_CHANGED`: confirm the account
-and restart MCP to accept it. Continuations expire when sessions change and
-must be restarted without a cursor. Rate limits and generic permission failures
-do not trigger authentication retries.
-
-Cookie strings and authenticated client objects live only in process memory.
-JavaScript does not guarantee string zeroization. Protect process memory and
-core dumps using deployment controls. CDP and Google cookies themselves grant
-more than read access; restricting this MCP's commands does not reduce those
-underlying privileges. No raw CDP/API or mutating tools are exposed.
-
-## Opt-in live read check
-
-Do not run this without the account owner's explicit approval. After logging
-into YouTube in the browser, run the check through the actual stdio MCP client. It
-requests five items per tool, chooses a playlist ID from the first response
-(or WL if none is listed), and checks account consistency across responses.
-No manual channel or playlist ID is required. Short lists may return fewer
-than five items. It prints only counts, safe error codes, timings, stderr byte count, and a
-safe diagnostic-validation summary, never titles, IDs, cookies, or raw server
-diagnostics. Valid nonempty JSONL is expected, not a failure. The checker
-rejects malformed, oversized, truncated, or non-allowlisted diagnostics using
-a bounded incremental parser. `YOUTUBE_LOG_LEVEL` is forwarded to the child.
-This remains a five-tool smoke check, not a performance benchmark.
+Live checks need the account owner's explicit approval each time. The
+read-only smoke check reads five items per read tool over stdio and prints
+only counts, codes and timings:
 
 ```sh
-YOUTUBE_LIVE_READONLY=1 \
-YOUTUBE_CDP_URL=http://127.0.0.1:9222 \
-bun run test:live
+YOUTUBE_LIVE_READONLY=1 YOUTUBE_CDP_URL=http://127.0.0.1:9222 bun run test:live
 ```
 
-Without opt-in the command exits before loading the reader or contacting CDP.
-`test:live` drives the stdio transport; the HTTP check used a throwaway
-JSON-RPC client with the same output limits.
-It is not a `*.test.ts` file and is excluded from the default test command.
-The default suite uses local protocol fixtures, not a browser or YouTube.
-See [VERIFICATION.md](VERIFICATION.md) for recorded verification limits.
+Without the opt-in it exits before contacting CDP. Write checks are run as
+throwaway probes that work in a new private playlist, or on a video, channel
+or setting chosen so the account ends as it started; they print flags,
+counts and timings only. [VERIFICATION.md](VERIFICATION.md) records each run.
 
-## Logging and audit
+## Verification status
 
-### Structured diagnostic contract
+All 18 tools were checked live on one account on 2026-11-10 and 2026-11-11.
 
-The server accepts `YOUTUBE_LOG_LEVEL=error|warn|info|debug`, with `info` as
-the default. Empty or unknown values stop startup without printing their
-contents or contacting CDP. There is no separate `YOUTUBE_DEBUG` flag.
-This contract does not enable upstream logs.
+| Area | Checked live | Not checked live |
+| --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| reads | five items per tool; full paging of Watch Later, playlists, subscriptions; new fields populated | accounts with no subscriptions, channels with no uploads, unknown channel IDs |
+| playlists | create (private; unlisted with description), delete, add/remove 1–50 videos, rename, move in a playlist and in Watch Later, not-found and duplicate refusals | public privacy, reading back privacy or description, `PLAYLIST_TOO_LONG` |
+| ratings | like and removal on a video that was not liked | removing a dislike |
+| subscriptions | subscribe and unsubscribe a channel that was not followed | — |
+| bells | all, none and personalized on one channel; refusal for an unfollowed channel | — |
+| transports | reads over stdio and HTTP; every write group over stdio; playlist writes over HTTP | a reverse proxy in front of HTTP |
+| failure paths | `WRITE_OUTCOME_UNKNOWN` from a real response (before a fix) | timeouts, 5xx and refusals on a live write; other accounts and layouts |
 
-Records use JSONL with `schema_version: 1`, UTC `timestamp`, `level`, and a
-fixed `event`. Permitted data is limited to internally generated correlation
-IDs, fixed stage/tool/result names, validated limits, counts, finite durations,
-cache states, and safe error codes. Unknown fields are discarded; invalid
-records are omitted rather than printed as raw diagnostic failures.
-Cookies, authorization headers, CDP URLs, account/video/playlist IDs, titles,
-cursors, raw arguments/responses/exceptions, and hashes of those values are
-never diagnostic fields. Requested MCP results remain on protocol stdout.
+Fixture tests cover the unchecked failure paths. A passing check shows the
+account's current responses matched; YouTube can change them, and unknown
+shapes fail closed.
 
-The writer retains at most 256 outstanding records or 256 KiB of UTF-8 JSONL,
-including newlines and writes pending inside the stream. New records are
-lost on saturation; after successful output resumes, `logs.dropped` reports
-unreported losses at warn level (filtered when configured at error).
-A broken sink disables diagnostic output without recursive error logging.
-Closing the writer waits at most one second. This is not lossless auditing:
-forced termination, broken stderr, and saturation can lose records, including
-completion and shutdown events. File capture, rotation, and retention belong
-to the operator, not this server.
+## Logging
 
-Startup emits `server.start` at info. SIGINT, SIGTERM, stdin EOF, and transport
-closure share an idempotent shutdown path: `server.stop` at info, then at most
-one second of diagnostic flushing. Repeated signals do not duplicate the stop
-event. A broken stderr cannot prevent exit; forced termination can lose all
-pending records. Unexpected process failures emit
-`server.fatal` at error with a fixed safe code rather than an exception or
-stack. Stderr is no longer normally empty. Stdout remains reserved for MCP
-messages, including requested results. YouTube.js logging stays disabled.
-Each validated tool execution emits one `request.end` with a generated
-`request_id`, tool name, limit, result, and monotonic `duration_ms`. Success
-is info with returned count; errors, timeouts, and cancellations are warn with
-safe codes. Timeout/cancellation summaries retain the active stage snapshot;
-normal cleanup aborts are not cancellations, and late work cannot publish a
-second completion. Ordinary tool failures keep their existing MCP codes.
+`YOUTUBE_LOG_LEVEL` selects `error`, `warn`, `info` (default) or `debug`.
+Records are JSONL on stderr with `schema_version: 1`, UTC `timestamp`, `level`
+and a fixed `event`. Fields are limited to generated correlation IDs, fixed
+stage, tool and result names, limits, counts, durations, cache states and safe
+error codes. Cookies, tokens, CDP URLs, account, video, playlist and channel
+IDs, titles, cursors and raw requests or responses are never logged, nor are
+their hashes. Requested results stay on stdout (stdio) or in the HTTP body.
 
-Timing starts after SDK input validation and ends when the operation's result
-or safe failure is decided. It excludes MCP serialization/transmission, client
-round-trip, process startup, discovery, and rejected inputs. Measure those
-externally rather than interpreting server duration as end-to-end latency.
-At debug, `stage.start`/`stage.end` identify these boundaries:
+| Event | Level | Content |
+| --------------------------- | ---------- | -------------------------------------------------------------- |
+| `server.start` | info | enabled write groups, if any |
+| `server.stop` | info | `SIGINT`, `SIGTERM` or `transport_closed` |
+| `server.fatal` | error | fixed code `PROCESS_FAILURE` |
+| `config.invalid` | error | configuration code |
+| `http.rejected` | warn | HTTP status |
+| `request.end` | info, warn | tool, `limit` for reads, outcome, safe code, duration, cache states |
+| `logs.dropped` | warn | count of records lost to backpressure |
+| `stage.start`/`stage.end` | debug | stage boundaries, see below |
+
+The writer keeps at most 256 records or 256 KiB pending; on saturation new
+records are dropped and later counted in `logs.dropped`. A broken sink
+disables diagnostics without recursion, and closing waits at most one second.
+This is not a lossless audit log; capture, rotation and retention belong to
+the operator. Shutdown paths share one idempotent `server.stop`.
+
+`request.end` timing starts after input validation and ends when the result or
+safe failure is decided; it excludes serialization, transport and startup. At
+debug, stages mark these inclusive boundaries:
 
 | Stage | Meaning |
 | ------------------ | ----------------------------------------------------- |
@@ -371,85 +392,37 @@ At debug, `stage.start`/`stage.end` identify these boundaries:
 | `normalize` | Local page normalization |
 | `pagination` | Page assembly, cursor management, and nested waits |
 
-Stage IDs and parent IDs describe nested **inclusive** durations; do not add
-nested or overlapping times to obtain total request time. Shared authentication
-has its own `refresh_id`, linked from each waiting request. Cancelling one
-waiter does not mark another waiter or the shared refresh as cancelled.
-These are local boundaries, not profiling inside YouTube or arbitrary source
-lines. Logging may lose events under backpressure, so a missing end event is
-not proof that work is still running.
-
-`auth_cache` distinguishes `hit`, `miss`, and `shared`; `mixed` means a request
-crossed states, such as reuse followed by reacquisition. `page_cache` is `miss`
-when upstream work is needed, `buffer` when retained items suffice, `replay`
-for a completed cursor result, or `shared` for another request's pending
-calculation. Cache fields are omitted when execution never reaches the relevant
-boundary. Replays and waiters do not fabricate upstream spans or log cursors.
-
-The opt-in check's summary is test evidence, not a production audit trail.
-Durable storage and retention are not provided. Do not enable upstream verbose
-logging as a substitute: it can expose session material.
+Nested stage durations are inclusive; do not add them. A shared
+authentication has its own `refresh_id`, linked from each waiting request.
+`auth_cache` is `hit`, `miss`, `shared` or `mixed`; `page_cache` is `miss`,
+`buffer`, `replay` or `shared`, omitted when not reached. Do not enable
+upstream verbose logging: it can expose session material.
 
 ## External latency verification
 
-Use an existing MCP client and collect stderr separately. There is no new
-benchmark command, background workload, or automatic performance verdict.
-The five-tool `test:live` command is a smoke check, not this procedure.
+Use an existing MCP client and collect stderr separately; there is no
+benchmark command. `test:live` is a smoke check, not this procedure.
 
 1. Obtain fresh account-owner approval for tools, limits, conditions, repeats,
-   preparation reads, and the time budget before touching a real account.
-   Previous five-item approval is not permission for repeated measurements.
-   Use local fixtures when approval is absent.
-1. Fix the tool, input limit, environment, and log level. Run sequentially,
-   without unrelated calls, and isolate condition logs. Default to five
-   **attempts per condition** and a **five-minute total budget**, including
-   preparation and process startup. The external client cancels the current
-   request when the remaining budget expires and starts no further requests.
-1. **Cold authentication:** use a new MCP process for every measured attempt;
-   the target call must be its first authenticated read. This does not reset
-   browser, OS, or YouTube caches. If playlist selection needs a preparation
-   read, obtain the ID beforehand and retain it only in client memory.
-1. **Warm authentication:** in one process, perform a preparation read, then
-   repeat the same input **without a cursor** five times while its snapshot
-   remains valid. Confirm `auth_cache=hit`; refresh/mixed cases do not count
-   as warm samples.
-1. **Cursor replay:** obtain a cursor, call it once to prepare its result, then
-   repeat that **same cursor**, tool, playlist, and limit five times. Do not
-   advance to the returned next cursor. Confirm `page_cache=replay`. If no
-   cursor exists, skip with a reason. Expiry or refresh invalidates the
-   condition; do not silently restart and label new work as replay.
-1. Stop the entire procedure immediately on `AUTH_REQUIRED`, `ACCOUNT_CHANGED`,
-   `UPSTREAM_BLOCKED`, or `RATE_LIMITED`, including during preparation.
-   Record other errors/timeouts separately and continue within the remaining
-   budget. If preparation cannot establish a condition, skip that condition
-   with a reason rather than inventing samples.
-1. Exclude preparation from latency statistics but count it in request totals
-   and budget. Report successful sample count, median/min/max, failure count
-   and safe codes, skipped conditions, missing diagnostics, and any stop
-   reason. With zero successful samples, report latency as **N/A**, not zero.
-   Keep server duration, externally measured client round-trip, and process
-   startup times in separate columns. Do not persist IDs, titles, or cursors.
-1. Generated request IDs identify server trace trees, not client request IDs.
-   Sequential call order helps map complete logs, but losses can make matching
-   ambiguous. Mark such measurements unavailable rather than guessing which
-   completion belongs to which attempt. Never count missing logs as successful
-   zero-duration calls or as confirmed query failures.
+   preparation reads and the time budget. Use local fixtures otherwise.
+1. Fix the tool, input limit, environment and log level. Run sequentially and
+   isolate condition logs. Default to five attempts per condition and a
+   five-minute total budget including preparation and startup; cancel the
+   current request when the budget expires.
+1. **Cold authentication:** a new MCP process per attempt; the target call is
+   its first authenticated read.
+1. **Warm authentication:** in one process, one preparation read, then the same
+   input without a cursor five times while `auth_cache=hit`.
+1. **Cursor replay:** prepare a cursor, then repeat that same cursor five times
+   and confirm `page_cache=replay`. Skip with a reason if no cursor exists.
+1. Stop on `AUTH_REQUIRED`, `ACCOUNT_CHANGED`, `UPSTREAM_BLOCKED` or
+   `RATE_LIMITED`. Record other failures separately within the budget.
+1. Report successful samples, median, min and max, failures with codes, skips
+   and missing diagnostics. With no samples report **N/A**. Keep server
+   duration, client round-trip and startup in separate columns; never persist
+   IDs, titles or cursors, and never count missing logs as zero-duration calls.
 
-Debug tracing changes measurement overhead. State the level and collector
-conditions with results. Do not compute p95 from these small samples, impose a
-fixed SLO, or automatically label a delay as an architecture versus implementation
-problem. Review evidence first; the user sets subsequent performance criteria.
-See [VERIFICATION.md](VERIFICATION.md#external-measurement-record-template)
-for the reporting template and an explicitly synthetic arithmetic example.
-
-## Verification boundary
-
-Local integration covers stdio through HTTP/WebSocket CDP and upstream
-fixtures, including cancellation, timeout, account changes, and secret-safe
-failures. This is not proof that a personal account's current YouTube response
-matches those fixtures. Unsupported structures fail closed.
-
-The HTTP transport is verified locally and in one live check; deployment
-behind a reverse proxy and all writes are separate changes. Nix packaging
-lives in `nix/youtube.nix`. Live read-only testing requires explicit approval and is not part
-of the default suite.
+Debug tracing adds overhead; state the level with results. Do not derive p95
+from these samples or impose a fixed SLO. See
+[VERIFICATION.md](VERIFICATION.md#external-measurement-record-template) for the
+reporting template.

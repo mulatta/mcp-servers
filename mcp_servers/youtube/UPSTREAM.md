@@ -1,9 +1,26 @@
 # Upstream boundaries
 
-Verified against installed `youtubei.js` 18.3.0. No personal browser or account
-was accessed for this inspection.
+Behaviour of YouTube and YouTube.js that this server depends on. Library
+statements were checked against the installed `youtubei.js` 18.3.0 source and
+upstream `main` at `ec7ef07` (2026-11-04). Live statements come from approved
+checks that printed key paths and enum constants only; no response body,
+identifier or credential was kept.
 
-## YouTube.js
+## YouTube.js defects worked around
+
+| Function | Defect | Upstream (`main` `ec7ef07`) | What this server does |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------- |
+| `PlaylistManager.delete()` | Builds `deletePlaylistServiceEndpoint` with `sourcePlaylistId`, but `DeletePlaylistEndpoint.buildRequest()` copies it only when a `playlistId` field exists, so the body names no playlist | Same code; no issue or pull request (2026-11-11) | Posts `{ playlistId }` to `playlist/delete` |
+| `PlaylistManager.setName()` | Puts the ID under `playlist_id`, which `PlaylistEditEndpoint.buildRequest()` ignores, so the edit names no playlist | Same code; no issue or pull request (2026-11-11) | Posts `ACTION_SET_PLAYLIST_NAME` with `playlistId` to `browse/edit_playlist` |
+
+Related upstream work: #898 (merged) fixed a doubled `VL` prefix in the
+private `#getPlaylist()`, unrelated to these; open #1284 (and the larger #872)
+fixes the same class of body-shape bug for `addToLibrary()` and
+`removeFromLibrary()`, which this server does not use. Revisit both rows when
+YouTube.js changes these files; until then no write goes through a
+`PlaylistManager` or `InteractionManager` method.
+
+## Session and identity
 
 - `Innertube.create({ cookie, account_index: 0, retrieve_player: false, enable_session_cache: false })` accepts a Cookie header string. No disk cache
   will be supplied. Player retrieval is unnecessary for library reads.
@@ -22,56 +39,14 @@ was accessed for this inspection.
 - Generate session context locally and disable Innertube config/player
   retrieval. This avoids unrelated bootstrap requests and lets transport
   restrict authenticated traffic to named routes.
-- Each operation names the routes it may reach; the transport compares the
-  whole request path against that set, so a browse grant never covers
-  `browse/edit_playlist`. Reads grant only `browse`. Write routes are the
-  paths of the YouTube.js 18.3.0 endpoint classes: `PlaylistEditEndpoint`
-  (`browse/edit_playlist`), `CreatePlaylistServiceEndpoint`
-  (`playlist/create`), `DeletePlaylistEndpoint` (`playlist/delete`),
-  `LikeEndpoint` (`like/like`, `like/removelike`), `SubscribeEndpoint`,
-  `UnsubscribeEndpoint` (`subscription/subscribe`, `subscription/unsubscribe`)
-  and `ModifyChannelNotificationPreferenceEndpoint`
-  (`notification/modify_channel_preference`).
-- `PlaylistManager.delete()` cannot be used in 18.3.0: the manager builds a
-  `deletePlaylistServiceEndpoint` with `sourcePlaylistId`, while
-  `DeletePlaylistEndpoint.buildRequest()` copies `sourcePlaylistId` only when a
-  `playlistId` field is present, so the request body carries no playlist. The
-  same code is on upstream `main` with no open issue or pull request. The
-  delete tool posts `{ playlistId }` to `playlist/delete` itself. Playlist
-  creation posts the `CreatePlaylistServiceEndpoint` body (`title`,
-  `privacyStatus`, `videoIds`, `description`) to `playlist/create` the same way,
-  so both writes are visible in one place.
-- `PlaylistManager.setName()` in 18.3.0 builds its payload with `playlist_id`,
-  which `PlaylistEditEndpoint.buildRequest()` ignores, so no playlist is named
-  in the request. The update tool posts `ACTION_SET_PLAYLIST_NAME` and
-  `ACTION_SET_PLAYLIST_DESCRIPTION` with `playlistId` to `browse/edit_playlist`.
-  Moves send `ACTION_MOVE_VIDEO_AFTER` with the entries' `setVideoId`s, read
-  from `playlistVideoRenderer` items as `moveVideo()` does, but over a bounded,
-  complete read so a duplicate entry is detected.
-- `InteractionManager.like()`/`removeRating()` send a `LikeEndpoint` with a
-  bare `target` string as the TV client. This session is WEB, and a live check
-  confirmed the web body `{ target: { videoId } }` on `like/like` and
-  `like/removelike`; both answer with a `frameworkUpdates.entityBatchUpdate`
-  mutation whose `likeStatusEntity.likeStatus` is `LIKE` or `INDIFFERENT`.
-- Subscribing posts `{ channelIds, params: "EgIIAhgA" }` to
-  `subscription/subscribe` and unsubscribing `{ channelIds, params: "CgIIAhgA" }`
-  to `subscription/unsubscribe`, the values `InteractionManager` uses. Both
-  answer with `actions[].updateSubscribeButtonAction` (`channelId`,
-  `subscribed`), which the tools require to match the request.
-- `InteractionManager.setNotificationPreferences()` encodes its own
-  `NotificationPreferences` protobuf. Instead, the bell tool reads the
-  channel's FEchannels bell dropdown, whose `menuServiceItemRenderer` items
-  pair an icon (`NOTIFICATIONS_ACTIVE`, `NOTIFICATIONS_NONE`,
-  `NOTIFICATIONS_OFF`) with `modifyChannelNotificationPreferenceEndpoint`
-  params, and posts the params of the wanted item to
-  `notification/modify_channel_preference`. The answer carries a
-  `subscriptionNotificationStateEntity.state`: `…_ALL`, `…_OCCASIONAL` for
-  personalized, or `…_OFF`.
 - `account.getInfo(true)` lists accounts using WEB and has `is_selected`, but
   `AccountItem` does not expose a stable channel ID as a dedicated field. Do not
   execute switch-account service endpoints to derive identity.
 - `Log.setLevel(Log.Level.NONE)` disables upstream console diagnostics before
   constructing a client. Do not return raw errors, request bodies, or headers.
+
+## Read routes
+
 - `getPlaylists()`, `getPlaylist("WL")`, `getPlaylist("LL")`, and `getHistory()`
   provide read surfaces. Continuation processing must preserve remaining items.
 - `getChannelsFeed()` browses `FEchannels`, the subscribed-channel list. Its
@@ -86,6 +61,12 @@ was accessed for this inspection.
   endpoint. The tab content is a `richGridRenderer` of `videoRenderer` or video
   `lockupViewModel` items; on this tab lockup metadata rows carry views and the
   upload label, not the channel name.
+- Playlist continuations now repeat an empty tab shell in `contents` beside
+  `onResponseReceivedActions`; continuation reads use only the appended items.
+- A playlist with no videos shows a `messageRenderer` reading "No videos in
+  this playlist yet" (newly created playlists) or "This playlist has no
+  videos."; both read as an empty list.
+- New user playlists get `PL` plus 11 characters; older ones `PL` plus 32.
 
 Local source references are under `node_modules/youtubei.js/dist/src/`:
 `core/Session.js`, `core/managers/AccountManager.js`, `utils/HTTPClient.js`,
@@ -141,6 +122,47 @@ change is on YouTube's side. Because reads use `parse: false`, the upgrade to
 Between 18.1.0 and 18.3.0 the only change on our request path is an optional
 chain in `Session` for remotely fetched config, which is unused because the
 session context is generated locally.
+
+## Write routes
+
+Each operation names the routes it may reach; the transport compares the whole
+request path against that set, so a `browse` grant never covers
+`browse/edit_playlist`. Reads grant only `browse`; each write grants only its
+route, and the reads a move or bell change needs run separately under
+`browse`. Routes are the API paths of the YouTube.js 18.3.0 endpoint classes.
+Bodies are built here, never by the YouTube.js managers.
+
+| Tool | Route | Body | Confirmation in the answer |
+| ---------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| create playlist | `playlist/create` | `title`, `privacyStatus`, `videoIds: []`, optional `description` | `playlistId` matching `PL` plus 10–64 characters |
+| delete playlist | `playlist/delete` | `playlistId` | none beyond a 2xx answer |
+| add, remove videos | `browse/edit_playlist` | `playlistId`, one `ACTION_ADD_VIDEO` / `ACTION_REMOVE_VIDEO_BY_VIDEO_ID` per video | `status: STATUS_SUCCEEDED` |
+| update playlist | `browse/edit_playlist` | `ACTION_SET_PLAYLIST_NAME`, `ACTION_SET_PLAYLIST_DESCRIPTION` | `status: STATUS_SUCCEEDED` |
+| move in playlist | `browse/edit_playlist` | `ACTION_MOVE_VIDEO_AFTER` with `setVideoId`, `movedSetVideoIdPredecessor` | `status: STATUS_SUCCEEDED` |
+| like, remove rating | `like/like`, `like/removelike` | `target: { videoId }` | a `likeStatusEntity` mutation with `LIKE` / `INDIFFERENT` |
+| subscribe, unsubscribe | `subscription/subscribe`, `/unsubscribe` | `channelIds`, `params` `EgIIAhgA` / `CgIIAhgA` | `actions[].updateSubscribeButtonAction` with the channel and new state |
+| notification bell | `notification/modify_channel_preference` | `params` from the channel's bell menu | a `subscriptionNotificationStateEntity.state` of `…_ALL`, `…_OCCASIONAL` (personalized) or `…_OFF` |
+
+Notes:
+
+- Removal by video ID needs no prior read, unlike `removeVideos()`, which pages
+  through the playlist for set IDs. Live, it removed every entry of the video,
+  including a duplicate.
+- Moves read `setVideoId` from `playlistVideoRenderer` items as `moveVideo()`
+  does, but over a bounded, complete read (60 pages) so a duplicate entry is
+  detected before anything is sent.
+- `InteractionManager.like()` and `removeRating()` send a bare `target` string
+  as the TV client. This session is WEB; the web body `{ target: { videoId } }`
+  was confirmed live. Create, like and subscribe answers also carry
+  `runAttestationCommand` actions, which are never executed.
+- `InteractionManager.setNotificationPreferences()` encodes its own
+  `NotificationPreferences` protobuf. Instead, the bell tool reads the
+  channel's FEchannels bell dropdown, whose `menuServiceItemRenderer` items
+  pair an icon (`NOTIFICATIONS_ACTIVE`, `NOTIFICATIONS_NONE`,
+  `NOTIFICATIONS_OFF`) with `modifyChannelNotificationPreferenceEndpoint`
+  params, and posts the params of the one item with the wanted icon.
+- A rejected write answers 4xx; any other failure after sending is reported as
+  `WRITE_OUTCOME_UNKNOWN`, because YouTube may have applied it.
 
 ## Chromium CDP
 

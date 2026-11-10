@@ -1,5 +1,54 @@
 # Verification record
 
+Live checks ran on one account with the account owner's approval. Each prints
+only flags, counts, timings and safe codes; no cookie, token, account, channel,
+playlist or video ID, title, or response body is stored here. Writes were
+made in a new private playlist, or on a video, channel or setting chosen so
+the account ended as it started. Entries are newest first.
+
+## Coverage summary
+
+| Tool | Live result | Entry |
+| ----------------------------------- | -------------------------------------------------------------------------- | ----------------------------------- |
+| `youtube_list_playlists` | five items; all pages | browse reads, paging |
+| `youtube_get_playlist` | five items; empty playlist; HTTP | browse reads, empty playlist, HTTP |
+| `youtube_get_watch_later` | five items; all 22 pages | browse reads, paging |
+| `youtube_get_liked_videos` | five items; 30 pages | browse reads, paging |
+| `youtube_get_watch_history` | five items; four pages, durations on regular videos | browse reads, durations |
+| `youtube_list_subscriptions` | five items; all pages; `all`/`none`/`personalized` bells | browse reads, paging, bells |
+| `youtube_get_channel_videos` | five items; upload labels, durations | browse reads, durations |
+| `youtube_create_playlist` | private; unlisted with description over HTTP | create/delete, HTTP writes |
+| `youtube_delete_playlist` | removed from the list within 0.5 s | create/delete |
+| `youtube_add_to_playlist` | 2 and 50 videos; Watch Later; a duplicate | playlist edits, HTTP writes |
+| `youtube_remove_from_playlist` | 1 and 50 videos; Watch Later restored in order | playlist edits, HTTP writes |
+| `youtube_update_playlist` | title and description | update/move |
+| `youtube_move_in_playlist` | in a playlist and in Watch Later; not-found and duplicate refusals | update/move, HTTP writes |
+| `youtube_like_video` | on a video that was not liked | ratings |
+| `youtube_remove_rating` | the same video; liked list restored | ratings |
+| `youtube_subscribe` | a channel that was not followed | subscriptions |
+| `youtube_unsubscribe` | the same channel; subscription set restored | subscriptions |
+| `youtube_set_channel_notifications` | all, none, personalized; unfollowed channel refused | bells |
+
+Not checked live: public playlist privacy, reading back privacy or a
+description (no read tool returns them), `PLAYLIST_TOO_LONG`, removing a
+dislike, live timeouts, 5xx or refusals on writes, accounts without
+subscriptions, channels without uploads, unknown channel IDs, a reverse proxy
+in front of HTTP, and accounts or layouts other than this one.
+
+## Approved live HTTP write check: 2026-11-11
+
+The server ran over HTTP with a random token and `YOUTUBE_WRITES=all`.
+`tools/list` returned 18 tools, 11 of them writes, and `server.start` listed all
+four groups. In a new playlist created as `UNLISTED` with a description: adding
+50 public uploads in one call showed all 50 after about 0.2 s;
+`youtube_move_in_playlist` refused a video not in the playlist with
+`PLAYLIST_ITEM_NOT_FOUND`; adding one of the videos again produced a second
+entry after about 2.5 s, and a move of that video was refused with
+`PLAYLIST_ITEM_AMBIGUOUS`; removing the 50 IDs emptied the playlist after about
+2.4 s, including the duplicate entry; the playlist was deleted. `request.end`
+recorded each write with its outcome and code, and the diagnostics contained
+neither the token nor the playlist ID.
+
 ## Approved live notification bell check: 2026-11-10
 
 With `YOUTUBE_WRITES=notification`, one subscribed channel whose bell was
@@ -383,10 +432,11 @@ account measurements require fresh approval covering preparation and repeats.
 
 ## Remaining limits
 
-The historical live section verifies five items per tool on one account, not exhaustive
-library traversal or compatibility with every account/layout. Account identity
-was checked for consistency across tools, not independently compared with a
-manually supplied browser channel ID. Future unknown structures fail closed.
-Remote edits may affect traversal. CDP and cookies retain broader authority
-outside the MCP's read-only boundary. Further live access still requires
-operator approval; a passing suite does not imply standing permission.
+Live checks show that one account's current responses matched; they are not
+proof for every account or layout, and YouTube can change them. Unknown
+structures fail closed. Account identity was checked for consistency across
+tools, not against a separately supplied channel ID. Writes were checked for
+the cases in the coverage summary; failure paths after sending are covered by
+fixtures only. CDP and the cookies grant more than the server's tools.
+Further live access requires fresh approval; a passing suite is not standing
+permission.
