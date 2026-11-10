@@ -356,7 +356,7 @@ All 19 tools were checked live on one account on 2026-11-10 and 2026-11-11.
 | subscriptions | subscribe and unsubscribe a channel that was not followed | — |
 | bells | all, none and personalized on one channel; refusal for an unfollowed channel | — |
 | transports | reads over stdio and HTTP; every write group over stdio; playlist writes over HTTP | a reverse proxy in front of HTTP |
-| failure paths | `WRITE_OUTCOME_UNKNOWN` from a real response (before a fix) | timeouts, 5xx and refusals on a live write; other accounts and layouts |
+| failure paths | `WRITE_OUTCOME_UNKNOWN` for a create whose answer was dropped and an add held past the deadline, both applied by YouTube | 5xx answers and refusals from YouTube on a live write; other accounts and layouts |
 
 Fixture tests cover the unchecked failure paths. A passing check shows the
 account's current responses matched; YouTube can change them, and unknown

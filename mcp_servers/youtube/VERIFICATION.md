@@ -32,9 +32,22 @@ the account ended as it started. Entries are newest first.
 
 Not checked live: creating a public playlist through the tool,
 `PLAYLIST_TOO_LONG`, removing a
-dislike, live timeouts, 5xx or refusals on writes, accounts without
+dislike, 5xx answers or refusals of live writes, accounts without
 subscriptions, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
+
+## Approved live uncertain-outcome check: 2026-11-11
+
+The server ran in process with a network wrapper that let each write reach
+YouTube and then lost its answer, and a 3 s deadline. A create whose answer was
+dropped after YouTube processed it returned `WRITE_OUTCOME_UNKNOWN`, and the
+playlist appeared in `youtube_list_playlists` about 2.4 s later. Adding a video
+to it with the answer held past the deadline also returned
+`WRITE_OUTCOME_UNKNOWN`, and the video was in the playlist when read
+immediately afterwards. A move refused before sending still returned
+`PLAYLIST_ITEM_NOT_FOUND`. The playlist was deleted and nothing was left.
+YouTube itself was not made to fail: 5xx answers and refusals of live writes
+remain covered by fixtures only.
 
 ## Approved live playlist details check: 2026-11-11
 
