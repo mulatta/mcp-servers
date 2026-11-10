@@ -3,6 +3,7 @@ import { request } from "node:http";
 import { startHttp } from "../../src/http.ts";
 import type { Reader } from "../../src/server.ts";
 import { captureDiagnostics } from "../fixtures/diagnostic-capture.ts";
+import { rpc } from "../fixtures/http.ts";
 
 const token = "a".repeat(32) + crypto.randomUUID().replaceAll("-", "");
 const servers: { stop(): Promise<void> }[] = [];
@@ -81,35 +82,18 @@ function raw(
   });
 }
 
-// The SDK's HTTP client declarations do not compile under exactOptionalPropertyTypes,
-// so the control speaks JSON-RPC directly, as any stateless Streamable HTTP client would.
-async function rpc(url: URL, method: string, params: unknown) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-      "mcp-protocol-version": "2025-06-18",
-    },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-  expect(response.status).toBe(200);
-  return (await response.json()) as { result?: Record<string, unknown> };
-}
-
 test("authorized client reaches the reader (control for rejection tests)", async () => {
   const { calls, reader } = spyReader();
   const server = await serve(reader);
-  const init = await rpc(server.url, "initialize", {
+  const init = await rpc(server.url, token, "initialize", {
     protocolVersion: "2025-06-18",
     capabilities: {},
     clientInfo: { name: "http-test", version: "1.0.0" },
   });
   expect(init.result?.serverInfo).toMatchObject({ name: "youtube-mcp" });
-  const list = await rpc(server.url, "tools/list", {});
+  const list = await rpc(server.url, token, "tools/list", {});
   expect(list.result?.tools).toHaveLength(5);
-  const call = await rpc(server.url, "tools/call", {
+  const call = await rpc(server.url, token, "tools/call", {
     name: "youtube_get_watch_history",
     arguments: {},
   });
