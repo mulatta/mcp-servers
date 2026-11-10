@@ -1,8 +1,26 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer, type Reader } from "./server.ts";
 import { createReader } from "./reader.ts";
-import { readLogLevel } from "./config.ts";
+import { readFile } from "node:fs/promises";
+import {
+  ConfigError,
+  readLogLevel,
+  readTransport,
+  type TransportConfig,
+} from "./config.ts";
+import { startHttp, validToken } from "./http.ts";
 import { Logger } from "./observability/logger.ts";
+
+async function readToken(path: string) {
+  let token;
+  try {
+    token = (await readFile(path, "utf8")).replace(/\n$/, "");
+  } catch {
+    throw new ConfigError("INVALID_HTTP_CONFIG");
+  }
+  if (!validToken(token)) throw new ConfigError("INVALID_HTTP_CONFIG");
+  return token;
+}
 
 export async function start(
   reader?: Reader,
@@ -32,16 +50,29 @@ export async function start(
     }
     const diagnostics = options.logger ?? new Logger(level);
     logger = diagnostics;
-    const server = createServer(reader ?? createReader(), {
-      ...options,
-      logger: diagnostics,
-    });
+    const refuse = async (error: unknown): Promise<never> => {
+      if (!(error instanceof ConfigError)) throw error;
+      diagnostics.emit({ event: "config.invalid", code: error.code });
+      await diagnostics.close();
+      process.exit(1);
+    };
+    let transport: TransportConfig;
+    let token = "";
+    try {
+      transport = readTransport();
+      if (transport.kind === "http")
+        token = await readToken(transport.tokenFile);
+    } catch (error) {
+      return refuse(error);
+    }
+    const shared = reader ?? createReader();
     let closing = false;
+    let close = async () => {};
     const stop = async (reason: "SIGINT" | "SIGTERM" | "transport_closed") => {
       if (closing || failing) return;
       closing = true;
       try {
-        await server.close();
+        await close();
         diagnostics.emit({ event: "server.stop", reason });
         await diagnostics.close();
         process.exit(0);
@@ -53,6 +84,19 @@ export async function start(
       process.on(event, () => {
         void stop(event);
       });
+    if (transport.kind === "http") {
+      const http = await startHttp(shared, {
+        ...transport,
+        token,
+        logger: diagnostics,
+        timeoutMs: options.timeoutMs,
+      }).catch(refuse);
+      close = () => http.stop();
+      diagnostics.emit({ event: "server.start" });
+      return;
+    }
+    const server = createServer(shared, { ...options, logger: diagnostics });
+    close = () => server.close();
     server.server.onclose = () => {
       void stop("transport_closed");
     };

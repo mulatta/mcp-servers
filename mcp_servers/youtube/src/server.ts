@@ -36,7 +36,7 @@ export function createServer(
   reader: Reader = async () => {
     throw new SafeError("UPSTREAM_UNAVAILABLE");
   },
-  options: { timeoutMs?: number; logger?: Logger } = {},
+  options: { timeoutMs?: number | undefined; logger?: Logger | undefined } = {},
 ) {
   const server = new McpServer({ name: "youtube-mcp", version: "0.0.0" });
   const paging = {

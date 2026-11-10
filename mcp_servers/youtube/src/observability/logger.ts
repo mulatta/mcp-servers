@@ -73,7 +73,20 @@ function events<T extends z.ZodType>(id: T) {
     }),
     z.object({
       event: z.literal("config.invalid"),
-      code: z.literal("INVALID_LOG_LEVEL"),
+      code: z.enum([
+        "INVALID_LOG_LEVEL",
+        "INVALID_TRANSPORT",
+        "INVALID_HTTP_CONFIG",
+      ]),
+    }),
+    z.object({
+      event: z.literal("http.rejected"),
+      status: z.union([
+        z.literal(401),
+        z.literal(403),
+        z.literal(404),
+        z.literal(405),
+      ]),
     }),
     z.object({ event: z.literal("logs.dropped"), count: count.positive() }),
     z.object({ event: z.literal("stage.start"), ...scope }),
@@ -128,6 +141,7 @@ function severity(data: {
   return data.event === "server.fatal" || data.event === "config.invalid"
     ? "error"
     : data.event === "logs.dropped" ||
+        data.event === "http.rejected" ||
         (data.event === "request.end" && data.outcome !== "ok")
       ? "warn"
       : data.event === "stage.start" || data.event === "stage.end"

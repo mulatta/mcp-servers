@@ -35,3 +35,44 @@ export function readConfig(
     throw new SafeError("BROWSER_UNAVAILABLE");
   }
 }
+
+export type ConfigCode = "INVALID_TRANSPORT" | "INVALID_HTTP_CONFIG";
+
+export class ConfigError extends Error {
+  constructor(readonly code: ConfigCode) {
+    super("Invalid configuration.");
+    this.name = "ConfigError";
+  }
+}
+
+export type TransportConfig =
+  | { kind: "stdio" }
+  | {
+      kind: "http";
+      hostname: string;
+      port: number;
+      tokenFile: string;
+      allowedHosts: string[];
+    };
+
+// Only the shape is checked here; startHttp owns token and host validity.
+export function readTransport(
+  env: Record<string, string | undefined> = process.env,
+): TransportConfig {
+  const kind = env.YOUTUBE_TRANSPORT ?? "stdio";
+  if (kind === "stdio") return { kind };
+  if (kind !== "http") throw new ConfigError("INVALID_TRANSPORT");
+  const port = env.YOUTUBE_HTTP_PORT ?? "";
+  const tokenFile = env.YOUTUBE_HTTP_TOKEN_FILE ?? "";
+  if (!/^[1-9][0-9]{0,4}$/.test(port) || Number(port) > 65535 || !tokenFile)
+    throw new ConfigError("INVALID_HTTP_CONFIG");
+  return {
+    kind,
+    hostname: env.YOUTUBE_HTTP_HOST || "127.0.0.1",
+    port: Number(port),
+    tokenFile,
+    allowedHosts: (env.YOUTUBE_HTTP_ALLOWED_HOSTS || "localhost,127.0.0.1")
+      .split(",")
+      .map((host) => host.trim()),
+  };
+}
