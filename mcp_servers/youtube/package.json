@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
-    "youtubei.js": "18.1.0",
+    "youtubei.js": "18.3.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

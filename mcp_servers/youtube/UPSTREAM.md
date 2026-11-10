@@ -1,6 +1,6 @@
 # Upstream boundaries
 
-Verified against installed `youtubei.js` 18.1.0. No personal browser or account
+Verified against installed `youtubei.js` 18.3.0. No personal browser or account
 was accessed for this inspection.
 
 ## YouTube.js
@@ -36,8 +36,8 @@ Local source references are under `node_modules/youtubei.js/dist/src/`:
 `parser/classes/AccountSectionList.js`, `parser/classes/AccountChannel.js`,
 `parser/classes/SettingsOptions.js`, and `parser/classes/CopyLink.js`.
 
-Latest upstream inspected: `bad89d2657e88f907011655f199fba9fb615c339`
-(`main`). AccountItem still has no dedicated immutable channel-ID property.
+Latest upstream inspected: `204715b6acfb063dc306d8677e36fdbf09f293c5`
+(`v18.3.0`). AccountItem still has no dedicated immutable channel-ID property.
 Issue <https://github.com/LuanRT/YouTube.js/issues/783> is a closed historical
 accounts-list 400 report, not proof of a current regression or released fix.
 The settings fixture used here is source-derived and synthetic, not captured
@@ -73,6 +73,17 @@ Shape-only live observations became synthetic regression cases in
 `tests/protocol/modern-layouts.test.ts`. No live response bodies, identifiers,
 or credential-bearing payloads were copied into fixtures. No dependency
 upgrade or upstream patch was required.
+
+A third approved live read failed `youtube_list_playlists` with
+`UPSTREAM_CHANGED`: saved courses now arrive in the playlist grid as
+`LOCKUP_CONTENT_TYPE_COURSE` lockups with a `PL` playlist ID and an
+`N lessons` badge. Upstream added the same content type to `LockupView` and to
+the playlist filter in `Feed` (merged PR #1313, released in 18.3.0), so the
+change is on YouTube's side. Because reads use `parse: false`, the upgrade to
+18.3.0 alone could not fix this; the normalizer accepts course lockups itself.
+Between 18.1.0 and 18.3.0 the only change on our request path is an optional
+chain in `Session` for remotely fetched config, which is unused because the
+session context is generated locally.
 
 ## Chromium CDP
 
