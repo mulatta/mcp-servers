@@ -213,6 +213,11 @@ privacy-change tools.
 
 ### How a write behaves
 
+Each write tool's description states its own caveats, because some clients
+(Hermes 0.23) pass only tool descriptions and error messages to the model.
+The server's MCP `instructions` summarize the same rules for clients that
+read them.
+
 - **Sent once.** A write is never retried, not even after an authentication
   failure, and every write uses the same pinned account as reads.
 

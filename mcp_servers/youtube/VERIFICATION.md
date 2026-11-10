@@ -36,6 +36,15 @@ dislike, 5xx answers or refusals of live writes, accounts without
 subscriptions, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
 
+## Approved live repeated-rating check: 2026-11-11
+
+Before tool descriptions stated that repeating a rating is harmless, a public
+upload absent from liked videos was liked twice (both successful, listed once)
+and its rating removed twice (both successful); the full liked list then
+matched the original. Over HTTP with `YOUTUBE_WRITES=all`, `initialize`
+returned 672 characters of instructions and `tools/list` 19 tools whose
+descriptions total 2,920 characters.
+
 ## Approved live uncertain-outcome check: 2026-11-11
 
 The server ran in process with a network wrapper that let each write reach

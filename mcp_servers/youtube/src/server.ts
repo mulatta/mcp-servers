@@ -44,6 +44,22 @@ const descriptions: Record<ToolName, string> = {
     "Read a channel's uploads, newest first, by channel ID.",
 };
 
+// Hermes forwards only tool descriptions and error messages to its model, so
+// every caveat a caller needs is in the descriptions; instructions repeat the
+// whole flow for clients that read them.
+const staleCursor =
+  "A cursor from before a write returns pre-write results; start without a cursor to see changes.";
+export const instructions = [
+  "This server reads and changes one YouTube account.",
+  "Writes are sent once and never retried.",
+  "After a write, lists show the change only after a delay (playlists a few seconds, Watch Later up to ~20 s, likes and subscriptions ~6 s); re-read without an old cursor and retry the read, not the write.",
+  "WRITE_OUTCOME_UNKNOWN means the write may have happened: read the target first, because repeating a create or add makes duplicates.",
+  "Removing a video removes all its entries in that playlist.",
+  "Moves need the video that should precede; they cannot move to the top.",
+  "Notification bells exist only for subscribed channels.",
+  "Use video and channel IDs from read results, never from URLs.",
+].join(" ");
+
 export function createServer(
   reader: Reader = async () => {
     throw new SafeError("UPSTREAM_UNAVAILABLE");
@@ -55,7 +71,10 @@ export function createServer(
     writes?: ReadonlySet<WriteGroup> | undefined;
   } = {},
 ) {
-  const server = new McpServer({ name: "youtube-mcp", version: "0.0.0" });
+  const server = new McpServer(
+    { name: "youtube-mcp", version: "0.0.0" },
+    { instructions },
+  );
   const paging = {
     limit: z.number().int().min(1).max(100).default(50),
     cursor: z.string().min(1).max(256).optional(),
@@ -73,7 +92,7 @@ export function createServer(
     server.registerTool(
       name,
       {
-        description: descriptions[name],
+        description: `${descriptions[name]} ${staleCursor}`,
         inputSchema,
         annotations: {
           readOnlyHint: true,
@@ -212,7 +231,7 @@ const writeTools: Record<
 > = {
   youtube_create_playlist: {
     description:
-      "Create an empty playlist on the authenticated account. Private unless privacy is given.",
+      "Create an empty playlist on the authenticated account. Private unless privacy is given. Not idempotent: on WRITE_OUTCOME_UNKNOWN, list playlists before retrying, or a second playlist is created. A new playlist appears in reads after a few seconds.",
     input: {
       title: z.string().min(1).max(150),
       privacy: z.enum(["PRIVATE", "UNLISTED", "PUBLIC"]).default("PRIVATE"),
@@ -222,25 +241,25 @@ const writeTools: Record<
   },
   youtube_delete_playlist: {
     description:
-      "Permanently delete one of the authenticated account's playlists by its PL playlist ID.",
+      "Delete one of the authenticated account's playlists by its PL playlist ID. Permanent: it cannot be restored.",
     input: { playlist_id: z.string().regex(userPlaylistId) },
     destructive: true,
   },
   youtube_add_to_playlist: {
     description:
-      "Add up to 50 videos to one of the account's playlists or to Watch Later (WL).",
+      "Add up to 50 videos to one of the account's playlists or to Watch Later (WL). Appends even if a video is already listed, creating a duplicate entry; on WRITE_OUTCOME_UNKNOWN read the playlist before retrying. Watch Later reads lag up to ~20 s.",
     input: { playlist_id: editablePlaylist, video_ids: videoBatch },
     destructive: false,
   },
   youtube_remove_from_playlist: {
     description:
-      "Remove up to 50 videos from one of the account's playlists or from Watch Later (WL).",
+      "Remove up to 50 videos from one of the account's playlists or from Watch Later (WL). Removes every entry of each video, including duplicates. Watch Later reads lag up to ~20 s.",
     input: { playlist_id: editablePlaylist, video_ids: videoBatch },
     destructive: true,
   },
   youtube_update_playlist: {
     description:
-      "Change the title and/or description of one of the account's PL playlists.",
+      "Change the title and/or description of one of the account's PL playlists. Title and description only; privacy cannot be changed.",
     input: {
       playlist_id: z.string().regex(userPlaylistId),
       title: z.string().min(1).max(150).optional(),
@@ -252,7 +271,7 @@ const writeTools: Record<
   },
   youtube_move_in_playlist: {
     description:
-      "Move a video so it follows another video in a PL playlist or Watch Later (WL).",
+      "Move a video in a PL playlist or Watch Later (WL) so it sits directly after after_video_id; moving to the top is not possible. Fails without changing anything if either video is missing or listed twice, or the playlist exceeds ~6000 entries.",
     input: {
       playlist_id: editablePlaylist,
       video_id: videoId,
@@ -262,30 +281,32 @@ const writeTools: Record<
     check: (input) => input.video_id !== input.after_video_id,
   },
   youtube_like_video: {
-    description: "Like a video on the authenticated account.",
+    description:
+      "Like a video on the authenticated account. Sets the rating; repeating is harmless. Liked videos update after a few seconds.",
     input: { video_id: videoId },
     destructive: false,
   },
   youtube_remove_rating: {
     description:
-      "Remove the authenticated account's like or dislike from a video.",
+      "Remove the authenticated account's like or dislike from a video. Sets the rating; repeating is harmless. Liked videos update after a few seconds.",
     input: { video_id: videoId },
     destructive: true,
   },
   youtube_subscribe: {
-    description: "Subscribe the authenticated account to a channel by UC ID.",
+    description:
+      "Subscribe the authenticated account to a channel by UC ID. The subscription list updates after ~6 s.",
     input: { channel_id: channelId },
     destructive: false,
   },
   youtube_unsubscribe: {
     description:
-      "Unsubscribe the authenticated account from a channel by UC ID.",
+      "Unsubscribe the authenticated account from a channel by UC ID. The subscription list updates after ~6 s.",
     input: { channel_id: channelId },
     destructive: true,
   },
   youtube_set_channel_notifications: {
     description:
-      "Set a subscribed channel's notification bell to all, personalized or none.",
+      "Set the notification bell of a channel the account subscribes to: all, personalized or none. Other channels fail with CHANNEL_NOT_SUBSCRIBED; subscribe first.",
     input: {
       channel_id: channelId,
       setting: z.enum(["all", "personalized", "none"]),

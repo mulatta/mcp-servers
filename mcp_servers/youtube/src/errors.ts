@@ -11,7 +11,8 @@ const messages = {
   PLAYLIST_ITEM_NOT_FOUND: "A requested video is not in this playlist.",
   PLAYLIST_ITEM_AMBIGUOUS:
     "A requested video appears more than once in this playlist.",
-  CHANNEL_NOT_SUBSCRIBED: "This account is not subscribed to the channel.",
+  CHANNEL_NOT_SUBSCRIBED:
+    "This account is not subscribed to the channel. Subscribe first.",
   PLAYLIST_TOO_LONG:
     "The playlist is too long to locate its entries; nothing was changed.",
   RATE_LIMITED: "YouTube rate limited this request. Try again later.",
@@ -20,7 +21,7 @@ const messages = {
   UPSTREAM_UNAVAILABLE: "YouTube data is currently unavailable.",
   TIMEOUT: "Request timed out.",
   WRITE_OUTCOME_UNKNOWN:
-    "The change was sent but its result is unknown. Read the target before retrying.",
+    "The change was sent but its result is unknown. Read the target before retrying; repeating a create or add can duplicate it.",
 } as const;
 export type ErrorCode = keyof typeof messages;
 
