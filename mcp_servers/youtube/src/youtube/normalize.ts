@@ -46,6 +46,49 @@ export type Kind =
 // Browse params selecting a channel's Videos tab, newest first.
 export const channelVideosParams = "EgZ2aWRlb3PyBgQKAjoA";
 
+export type PlaylistDetails = {
+  title: string | null;
+  description: string | null;
+  privacy: "private" | "unlisted" | "public" | null;
+};
+const privacyLabels: Record<string, PlaylistDetails["privacy"]> = {
+  Private: "private",
+  Unlisted: "unlisted",
+  Public: "public",
+};
+
+/**
+ * Title and description come from the playlist metadata; privacy only from a
+ * single exact label among the page header's metadata parts.
+ */
+export function playlistDetails(raw: unknown): PlaylistDetails {
+  const response = object(raw);
+  const metadata = object(object(response.metadata).playlistMetadataRenderer);
+  const header = object(
+    object(object(response.header).pageHeaderRenderer).content,
+  ).pageHeaderViewModel;
+  if (!Object.keys(metadata).length && !header)
+    throw new SafeError("UPSTREAM_CHANGED");
+  const rows = object(
+    object(object(header).metadata).contentMetadataViewModel,
+  ).metadataRows;
+  const labels = new Set<PlaylistDetails["privacy"]>();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const parts = object(row).metadataParts;
+    for (const part of Array.isArray(parts) ? parts : []) {
+      const label = text(object(part).text);
+      if (label !== null && Object.hasOwn(privacyLabels, label))
+        labels.add(privacyLabels[label]!);
+    }
+  }
+  return {
+    title: typeof metadata.title === "string" ? metadata.title : null,
+    description:
+      typeof metadata.description === "string" ? metadata.description : null,
+    privacy: labels.size === 1 ? [...labels][0]! : null,
+  };
+}
+
 export function resultEnvelope(
   accountId: string,
   items: Item[],

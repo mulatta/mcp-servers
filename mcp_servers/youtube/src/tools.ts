@@ -11,6 +11,11 @@ export const toolNames = [
   "youtube_get_channel_videos",
 ] as const;
 export type ToolName = (typeof toolNames)[number];
+// Read tools that return one object instead of a page of items.
+export const detailToolNames = ["youtube_get_playlist_details"] as const;
+export type DetailToolName = (typeof detailToolNames)[number];
+export type ReadToolName = ToolName | DetailToolName;
+export const readToolNames = [...toolNames, ...detailToolNames];
 
 // User playlists: new ones get "PL" plus 11 characters, older ones "PL" plus 32.
 export const userPlaylistId = /^PL[A-Za-z0-9_-]{10,64}$/;
@@ -31,8 +36,9 @@ export const writeToolGroups = {
 } as const satisfies Record<string, WriteGroup>;
 export type WriteToolName = keyof typeof writeToolGroups;
 export const writeToolNames = Object.keys(writeToolGroups) as WriteToolName[];
-export const allToolNames = [...toolNames, ...writeToolNames] as [
-  ToolName | WriteToolName,
-  ...(ToolName | WriteToolName)[],
-];
-export type AnyToolName = ToolName | WriteToolName;
+export const allToolNames = [
+  ...toolNames,
+  ...detailToolNames,
+  ...writeToolNames,
+] as [AnyToolName, ...AnyToolName[]];
+export type AnyToolName = ReadToolName | WriteToolName;

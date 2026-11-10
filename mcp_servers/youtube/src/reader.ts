@@ -19,7 +19,14 @@ export function createBackend(
   });
   const pages = new Paginator(sessions);
   return {
-    reader: (name, input, signal) => pages.read(name, input, signal),
+    reader: (name, input, signal) =>
+      name === "youtube_get_playlist_details"
+        ? sessions.run(signal, false, async (snapshot) => ({
+            account_id: snapshot.accountId,
+            playlist_id: input.playlist_id,
+            ...(await snapshot.value.details(input.playlist_id!, signal)),
+          }))
+        : pages.read(name, input, signal),
     writer: createWriter(sessions),
   };
 }

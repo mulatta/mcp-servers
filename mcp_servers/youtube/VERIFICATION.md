@@ -16,12 +16,13 @@ the account ended as it started. Entries are newest first.
 | `youtube_get_liked_videos` | five items; 30 pages | browse reads, paging |
 | `youtube_get_watch_history` | five items; four pages, durations on regular videos | browse reads, durations |
 | `youtube_list_subscriptions` | five items; all pages; `all`/`none`/`personalized` bells | browse reads, paging, bells |
+| `youtube_get_playlist_details` | unlisted, private, Watch Later, liked, deleted | details |
 | `youtube_get_channel_videos` | five items; upload labels, durations; unknown and upload-less channels | browse reads, durations, channel edge cases |
-| `youtube_create_playlist` | private; unlisted with description over HTTP | create/delete, HTTP writes |
+| `youtube_create_playlist` | private; unlisted with description, read back; HTTP | create/delete, details, HTTP writes |
 | `youtube_delete_playlist` | removed from the list within 0.5 s | create/delete |
 | `youtube_add_to_playlist` | 2 and 50 videos; Watch Later; a duplicate | playlist edits, HTTP writes |
 | `youtube_remove_from_playlist` | 1 and 50 videos; Watch Later restored in order | playlist edits, HTTP writes |
-| `youtube_update_playlist` | title and description | update/move |
+| `youtube_update_playlist` | title and description, read back | update/move, details |
 | `youtube_move_in_playlist` | in a playlist and in Watch Later; not-found and duplicate refusals | update/move, HTTP writes |
 | `youtube_like_video` | on a video that was not liked | ratings |
 | `youtube_remove_rating` | the same video; liked list restored | ratings |
@@ -29,11 +30,24 @@ the account ended as it started. Entries are newest first.
 | `youtube_unsubscribe` | the same channel; subscription set restored | subscriptions |
 | `youtube_set_channel_notifications` | all, none, personalized; unfollowed channel refused | bells |
 
-Not checked live: public playlist privacy, reading back privacy or a
-description (no read tool returns them), `PLAYLIST_TOO_LONG`, removing a
+Not checked live: creating a public playlist through the tool,
+`PLAYLIST_TOO_LONG`, removing a
 dislike, live timeouts, 5xx or refusals on writes, accounts without
 subscriptions, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
+
+## Approved live playlist details check: 2026-11-11
+
+Key-only probes found privacy only as a header label (`Private`, `Unlisted`,
+`Public`, one empty test playlist each, deleted at once) and the description
+only in the playlist metadata. With `youtube_get_playlist_details`: a playlist
+created `UNLISTED` with a description read back as `unlisted` with the same
+title and description after about 2.3 s; after `youtube_update_playlist`
+changed both, the new title and description read back after about 2.3 s; a
+playlist created without options read back as `private` with no description.
+Both playlists were deleted, and reading a deleted one returned
+`PLAYLIST_UNAVAILABLE`. Watch Later and liked videos carry no privacy label and
+read as `privacy: null`.
 
 ## Approved live channel edge-case check: 2026-11-11
 

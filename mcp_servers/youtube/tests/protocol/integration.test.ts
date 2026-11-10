@@ -6,7 +6,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { libraryServer } from "../fixtures/library-server.ts";
 import { resultSchema } from "../../src/youtube/normalize.ts";
-import { toolNames } from "../../src/server.ts";
+import { readToolNames, toolNames } from "../../src/server.ts";
 import { validDiagnostic } from "../../src/observability/logger.ts";
 
 async function until(predicate: () => boolean) {
@@ -60,7 +60,9 @@ for (const level of ["info", "debug"] as const)
     };
     try {
       await client.connect(transport, { timeout: 3000 });
-      expect((await client.listTools()).tools).toHaveLength(toolNames.length);
+      expect((await client.listTools()).tools).toHaveLength(
+        readToolNames.length,
+      );
       expect(f.browser.discoveries).toBe(0);
       expect(f.paths).toEqual([]);
       const concurrent = await Promise.all([call(), call()]);

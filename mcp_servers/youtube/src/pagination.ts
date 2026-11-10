@@ -2,6 +2,7 @@ import { SessionProvider, type Snapshot } from "./auth/session.ts";
 import { SafeError } from "./errors.ts";
 import { stage, recordCache } from "./observability/trace.ts";
 import type { ReadInput, ToolName } from "./server.ts";
+import type { ReadToolName } from "./tools.ts";
 import type { YoutubeClient } from "./youtube/client.ts";
 import { resultEnvelope, type Item, type Result } from "./youtube/normalize.ts";
 
@@ -60,10 +61,13 @@ export class Paginator {
   }
 
   async read(
-    name: ToolName,
+    name: ReadToolName,
     input: ReadInput,
     signal: AbortSignal,
   ): Promise<Result> {
+    // Detail tools return one object and never page.
+    if (name === "youtube_get_playlist_details")
+      throw new SafeError("UPSTREAM_UNAVAILABLE");
     return stage("pagination", () => this.readPage(name, input, signal));
   }
 

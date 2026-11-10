@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { request } from "node:http";
 import { startHttp } from "../../src/http.ts";
-import { toolNames, type Reader } from "../../src/server.ts";
+import { readToolNames, type Reader } from "../../src/server.ts";
 import { captureDiagnostics } from "../fixtures/diagnostic-capture.ts";
 import { rpc } from "../fixtures/http.ts";
 
@@ -92,7 +92,7 @@ test("authorized client reaches the reader (control for rejection tests)", async
   });
   expect(init.result?.serverInfo).toMatchObject({ name: "youtube-mcp" });
   const list = await rpc(server.url, token, "tools/list", {});
-  expect(list.result?.tools).toHaveLength(toolNames.length);
+  expect(list.result?.tools).toHaveLength(readToolNames.length);
   const call = await rpc(server.url, token, "tools/call", {
     name: "youtube_get_watch_history",
     arguments: {},

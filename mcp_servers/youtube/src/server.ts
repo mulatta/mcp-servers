@@ -6,10 +6,12 @@ import { withRequest } from "./observability/trace.ts";
 import type { Logger } from "./observability/logger.ts";
 
 import {
+  detailToolNames,
   toolNames,
   userPlaylistId,
   writeToolGroups,
   writeToolNames,
+  type ReadToolName,
   type ToolName,
   type WriteToolName,
 } from "./tools.ts";
@@ -17,7 +19,7 @@ import type { WriteGroup } from "./config.ts";
 import { settle, type Writer } from "./writer.ts";
 import type { Attempt } from "./youtube/client.ts";
 
-export { toolNames, type ToolName };
+export { readToolNames, toolNames, type ToolName } from "./tools.ts";
 export interface ReadInput {
   limit: number;
   cursor?: string | undefined;
@@ -25,7 +27,7 @@ export interface ReadInput {
   channel_id?: string | undefined;
 }
 export type Reader = (
-  name: ToolName,
+  name: ReadToolName,
   input: ReadInput,
   signal: AbortSignal,
 ) => Promise<Record<string, unknown>>;
@@ -102,6 +104,43 @@ export function createServer(
       },
     );
   }
+  for (const name of detailToolNames)
+    server.registerTool(
+      name,
+      {
+        description:
+          "Read a playlist's title, description and privacy by playlist ID.",
+        inputSchema: z.strictObject({
+          playlist_id: z.string().regex(/^[A-Za-z0-9_-]{2,150}$/),
+        }),
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          openWorldHint: true,
+        },
+      },
+      async (input, extra) => {
+        try {
+          const result = await withRequest(
+            options.logger,
+            name,
+            undefined,
+            () =>
+              withDeadline(
+                extra.signal,
+                options.timeoutMs ?? 30_000,
+                (signal) => reader(name, { limit: 1, ...input }, signal),
+              ),
+          );
+          return {
+            structuredContent: result,
+            content: [{ type: "text", text: JSON.stringify(result) }],
+          };
+        } catch (error) {
+          return errorResult(error);
+        }
+      },
+    );
   const writer = options.writer;
   if (writer)
     for (const name of writeToolNames) {

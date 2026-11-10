@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { PipeMcp } from "../fixtures/pipe-mcp.ts";
 import { libraryServer } from "../fixtures/library-server.ts";
-import { toolNames } from "../../src/server.ts";
+import { readToolNames } from "../../src/server.ts";
 
 async function until(check: () => boolean) {
   for (let i = 0; i < 100 && !check(); i++) await Bun.sleep(5);
@@ -21,7 +21,9 @@ for (const broken of [false, true])
       });
     try {
       await client.connect(transport, { timeout: 3000 });
-      expect((await client.listTools()).tools).toHaveLength(toolNames.length);
+      expect((await client.listTools()).tools).toHaveLength(
+        readToolNames.length,
+      );
       expect((await call()).isError).not.toBe(true);
       f.stall = true;
       expect(JSON.stringify(await call())).toContain("TIMEOUT");

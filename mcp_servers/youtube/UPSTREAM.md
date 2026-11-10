@@ -71,6 +71,12 @@ YouTube.js changes these files; until then no write goes through a
   this playlist yet" (newly created playlists) or "This playlist has no
   videos."; both read as an empty list.
 - New user playlists get `PL` plus 11 characters; older ones `PL` plus 32.
+- A playlist page carries its title and description in
+  `metadata.playlistMetadataRenderer` (no `description` key when empty) and its
+  privacy only as a header label, `Private`, `Unlisted` or `Public`, among
+  `pageHeaderViewModel` metadata parts; `microformat` holds just an `unlisted`
+  flag. The session language is fixed to English, so the labels are stable
+  for this server.
 
 Local source references are under `node_modules/youtubei.js/dist/src/`:
 `core/Session.js`, `core/managers/AccountManager.js`, `utils/HTTPClient.js`,

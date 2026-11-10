@@ -1,7 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Innertube, Log, YTNodes } from "youtubei.js";
 import { SafeError } from "../errors.ts";
-import { channelVideosParams, normalize, type Page } from "./normalize.ts";
+import {
+  channelVideosParams,
+  normalize,
+  playlistDetails,
+  type Page,
+} from "./normalize.ts";
 import { checkResponse } from "./response.ts";
 import { stage } from "../observability/trace.ts";
 import type { ToolName, ReadInput } from "../server.ts";
@@ -176,6 +181,18 @@ export class YoutubeClient {
           { continuation: !!continuation },
         ),
       );
+    });
+  }
+
+  async details(playlistId: string, signal: AbortSignal) {
+    return this.use(signal, async (client) => {
+      const response = await stage("upstream.request", () =>
+        client.actions.execute("/browse", {
+          browseId: `VL${playlistId}`,
+          parse: false,
+        }),
+      );
+      return stage("normalize", () => playlistDetails(response.data));
     });
   }
 

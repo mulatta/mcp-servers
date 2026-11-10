@@ -107,9 +107,11 @@ Client configuration (Claude Code):
 | `youtube_get_watch_history` | Watch history | None |
 | `youtube_list_subscriptions` | Subscribed channels and their bell | None |
 | `youtube_get_channel_videos` | A channel's uploads, newest first | `channel_id` |
+| `youtube_get_playlist_details` | One playlist's title, description, privacy | `playlist_id` |
 
-All read tools take optional `limit` (1–100, default 50) and `cursor`, and
-declare read-only, non-destructive annotations. Playlist IDs contain letters,
+List tools take optional `limit` (1–100, default 50) and `cursor`;
+`youtube_get_playlist_details` takes only `playlist_id`. All read tools declare
+read-only, non-destructive annotations. Playlist IDs contain letters,
 digits, `_` or `-`; channel IDs are `UC` plus 22 such characters. URLs and
 handles are not accepted, and unknown arguments are rejected before any
 request.
@@ -120,7 +122,7 @@ request.
 
 ### Results
 
-[Validated examples](examples/results.json) cover every read tool. Successful
+[Validated examples](examples/results.json) cover every list tool. Successful
 responses carry identical JSON in `structuredContent` and the text block:
 
 - `account_id`: the verified, pinned channel ID of the account.
@@ -136,13 +138,21 @@ responses carry identical JSON in `structuredContent` and the text block:
 | `youtube_list_subscriptions` | `channel_id`, `title`, `handle`, `subscriber_count_text`, `notification` |
 
 - `availability`: `available`, `private`, `deleted`, `unavailable` or `null`.
+
 - `watched_percent`: the 0–100 progress shown on the thumbnail, or `null` when
   none is shown (unwatched or unknown; never `0`).
+
 - `duration_seconds`: from the exact length or an `H:MM:SS`/`M:SS` label; live
   streams, Shorts and anything that is not an exact clock report `null`.
+
 - `watched_at` is always `null`: history carries no exact timestamps.
   Relative labels such as `Today` stay in `group_label`.
+
 - `published_text`: YouTube's relative upload label, such as `2 days ago`.
+  `youtube_get_playlist_details` returns `{ account_id, playlist_id, title, description, privacy }` without items or cursor. `description` is `null` when
+  the playlist has none; `privacy` is `private`, `unlisted` or `public` from the
+  page header's exact label, or `null` when there is not exactly one.
+
 - `handle` is the `@name`; `subscriber_count_text` is shown as YouTube displays
   it; `notification` is `all`, `personalized` or `none`, read from the icon of
   the channel's current bell state.
@@ -336,12 +346,12 @@ counts and timings only. [VERIFICATION.md](VERIFICATION.md) records each run.
 
 ## Verification status
 
-All 18 tools were checked live on one account on 2026-11-10 and 2026-11-11.
+All 19 tools were checked live on one account on 2026-11-10 and 2026-11-11.
 
 | Area | Checked live | Not checked live |
 | --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | reads | five items per tool; full paging of Watch Later, playlists, subscriptions; new fields populated; unknown and upload-less channels | accounts with no subscriptions |
-| playlists | create (private; unlisted with description), delete, add/remove 1–50 videos, rename, move in a playlist and in Watch Later, not-found and duplicate refusals | public privacy, reading back privacy or description, `PLAYLIST_TOO_LONG` |
+| playlists | create (private; unlisted with description, both read back), delete, add/remove 1–50 videos, rename, move in a playlist and in Watch Later, not-found and duplicate refusals | creating a public playlist through the tool, `PLAYLIST_TOO_LONG` |
 | ratings | like and removal on a video that was not liked | removing a dislike |
 | subscriptions | subscribe and unsubscribe a channel that was not followed | — |
 | bells | all, none and personalized on one channel; refusal for an unfollowed channel | — |
