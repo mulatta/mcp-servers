@@ -335,6 +335,7 @@ export function normalize(raw: unknown, kind: Kind): Page {
         !message ||
         ![
           "This playlist has no videos.",
+          "No videos in this playlist yet",
           "Your history is empty.",
           "No playlists",
         ].includes(message)

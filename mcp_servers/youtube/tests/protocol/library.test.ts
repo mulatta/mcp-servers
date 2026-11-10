@@ -127,3 +127,45 @@ test("unknown response or list renderer is not a successful empty result", () =>
     expect(() => normalize(data, "videos")).toThrow();
   }
 });
+
+// Observed live on a newly created playlist.
+test("an empty playlist reads as an empty list", () => {
+  const page = normalize(
+    {
+      contents: {
+        twoColumnBrowseResultsRenderer: {
+          tabs: [
+            {
+              tabRenderer: {
+                selected: true,
+                content: {
+                  sectionListRenderer: {
+                    contents: [
+                      {
+                        itemSectionRenderer: {
+                          contents: [
+                            {
+                              messageRenderer: {
+                                text: {
+                                  runs: [
+                                    { text: "No videos in this playlist yet" },
+                                  ],
+                                },
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+    "videos",
+  );
+  expect(page).toEqual({ items: [], continuation: null });
+});

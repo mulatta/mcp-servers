@@ -1,5 +1,11 @@
 # Verification record
 
+## Approved live empty-playlist read: 2026-11-10
+
+A newly created private playlist read back through `youtube_get_playlist` as
+zero items with no further page about 2.3 s after creation (the first attempt,
+before the playlist propagated, was refused), and was then deleted.
+
 ## Approved live playlist create/delete check: 2026-11-10
 
 With `YOUTUBE_WRITES=playlist`, the first live create returned
