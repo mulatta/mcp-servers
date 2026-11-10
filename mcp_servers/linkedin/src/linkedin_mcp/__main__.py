@@ -9,9 +9,10 @@ def main() -> None:
         "--cdp-url", required=True, help="HTTP(S) or WS(S) CDP endpoint (no default)"
     )
     args = parser.parse_args()
+    from linkedin_mcp.browser import BrowserSession
     from linkedin_mcp.server import create_server
 
-    create_server(args.cdp_url).run(transport="stdio")
+    create_server(BrowserSession(args.cdp_url)).run(transport="stdio")
 
 
 if __name__ == "__main__":
