@@ -35,6 +35,8 @@ Upstream saved-account selection and subsequent navigation back to the profile a
 
 The MCP creates a dedicated tab in the existing context and serializes lookups. Shutdown and request cancellation release only that tab and the client connection, preserving user tabs, the browser, and its login session. Connection loss fails the in-flight request; the next explicit request reconnects. Failed requests are never replayed automatically.
 
+Tabs are created with CDP `Target.createTarget(background=true)` in the existing default context. The returned target ID is recorded before Page initialization, matched against Patchright Pages by CDP target identity, and used for cleanup even when initialization fails or is cancelled. There is no foreground fallback or focus-restoration call. This does not yet implement the planned request-scoped lease, deadline, or blocked-cleanup recovery policy.
+
 The application does not guess ownership to remove tabs left behind after disconnection. Connection errors omit endpoint passwords and tokens and suggest checking discovery addresses and relay availability.
 
 ## Diagnostics for personal use
