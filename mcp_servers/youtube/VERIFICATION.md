@@ -1,5 +1,42 @@
 # Verification record
 
+## Approved live browse-read check: 2026-11-10
+
+The account owner asked for a live check of the new browse reads. The stdio
+server ran from commit `061fca8` with `YOUTUBE_CDP_URL=http://127.0.0.1:9222`
+through `bun run test:live`, which reads five items with each tool. The
+subscription read supplied the channel ID for the uploads read. Two throwaway
+probes then printed only field counts and renderer key names. No cookie,
+account ID, channel/playlist/video ID, title, handle, or response body is
+stored here.
+
+| Tool | Returned | More pages | Fields null in every item | Elapsed |
+| ---------------------------- | -------: | ---------- | ------------------------- | ------: |
+| `youtube_list_playlists` | 5 | Yes | — | 652 ms |
+| `youtube_get_playlist` | 5 | Yes | — | 543 ms |
+| `youtube_get_watch_later` | 5 | Yes | — | 487 ms |
+| `youtube_get_liked_videos` | 5 | Yes | — | 454 ms |
+| `youtube_get_watch_history` | 5 | Yes | `channel_name` | 967 ms |
+| `youtube_list_subscriptions` | 5 | Yes | — | 669 ms |
+| `youtube_get_channel_videos` | 5 | Yes | `channel_name` (by design) | 266 ms |
+
+Every response carried the same account ID; nine diagnostic records were
+valid.
+
+New fields, counted over five items each:
+
+- `watched_percent`: 3 of 5 in Watch Later, 4 of 5 in liked videos, 1 of 5 in
+  channel uploads, all within 0–100. History returned 0 of 5: a key-only scan
+  of its first page found 191 `shortsLockupViewModel` and 8 `lockupViewModel`
+  entries, with 7 `thumbnailOverlayProgressBarViewModel` progress bars, so the
+  first five entries were Shorts, which carry neither progress nor a channel.
+- `youtube_list_subscriptions`: 5 of 5 handles start with `@`, 5 of 5
+  subscriber labels matched, and every bell resolved (all `personalized`).
+- `youtube_get_channel_videos`: 5 of 5 `published_text` labels ending in `ago`.
+
+Not covered: an account with no subscriptions, a channel with no uploads, an
+unknown channel ID, and the `all` and `none` bell icons on a live response.
+
 ## Approved live HTTP check: 2026-11-10
 
 The account owner explicitly requested a live read of five items with each
