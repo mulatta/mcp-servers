@@ -1,6 +1,13 @@
+# nix
 .direnv/
 result
 result-*
+
+# python
 .venv/
 __pycache__/
 *.pyc
+
+# openspec
+openspec/**
+UPSTREAM.md
