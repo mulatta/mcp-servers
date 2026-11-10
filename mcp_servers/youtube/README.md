@@ -3,9 +3,10 @@
 Read-only YouTube MCP server using Bun and TypeScript.
 
 Five read-only tools are connected to the CDP session provider, YouTube.js
-adapter, normalization, and bounded pagination. Stdio discovery is credential
-free; actual reads authenticate lazily. Local integration tests pass. An
-approved live check returned five items from each tool on one account;
+adapter, normalization, and bounded pagination. The server speaks MCP over
+stdio or authenticated HTTP. Discovery is credential free; actual reads
+authenticate lazily. Local integration tests pass. Approved live checks over
+both transports returned five items from each tool on one account;
 see [VERIFICATION.md](VERIFICATION.md) for scope and remaining limits.
 
 ## Development
@@ -41,6 +42,51 @@ as the absolute path to `mcp_servers/youtube`. Stdout contains only MCP protocol
 messages; diagnostics must go to stderr without session details.
 
 Tool discovery does not require a running browser or credentials.
+
+## Run over HTTP
+
+Set `YOUTUBE_TRANSPORT=http` to serve stateless Streamable HTTP at `/mcp`:
+
+```sh
+YOUTUBE_TRANSPORT=http \
+YOUTUBE_HTTP_PORT=8765 \
+YOUTUBE_HTTP_TOKEN_FILE=/run/credentials/youtube-mcp/token \
+bun run start
+```
+
+| Variable | Default | Meaning |
+| ---------------------------- | --------------------- | -------------------------------------------- |
+| `YOUTUBE_HTTP_PORT` | required | TCP port, 1–65535 |
+| `YOUTUBE_HTTP_TOKEN_FILE` | required | File holding the bearer token on one line |
+| `YOUTUBE_HTTP_HOST` | `127.0.0.1` | Listen address |
+| `YOUTUBE_HTTP_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated hostnames accepted in `Host` |
+
+The token must be at least 32 visible ASCII characters with no whitespace;
+one trailing newline is ignored. Generate it with `openssl rand -hex 32`.
+Invalid or incomplete configuration logs `config.invalid` and exits 1 before
+listening.
+
+Each request is checked in this order: `Host` hostname against the allowlist
+(403), `Authorization: Bearer` with a constant-time comparison (401), path
+`/mcp` (404), and method `POST` (405). Rejections log `http.rejected` with the
+status only. `Host` is matched by hostname without the port, so a reverse
+proxy that keeps the original host passes unchanged. Keep the listener on
+loopback and put TLS in front; the server itself speaks plain HTTP.
+
+Every request gets a fresh MCP server, and all requests share one reader, so
+concurrent clients share one browser refresh and one cursor store. Cursors
+work across clients but compete for the same 128-entry limit, and an
+authentication failure in any request expires every outstanding cursor.
+
+Client configuration (Claude Code):
+
+```json
+{
+  "type": "http",
+  "url": "https://youtube-mcp.example/mcp",
+  "headers": { "Authorization": "Bearer <token>" }
+}
+```
 
 ## Tools
 
@@ -133,12 +179,14 @@ bun run test
 The protocol suite starts a real Bun subprocess and MCP client to check
 initialization, discovery, error responses, and shutdown without a browser.
 In-process MCP sessions exercise schema rejection, secret-safe errors,
-deadlines, and cancellation. These tests do not access a personal account.
+deadlines, and cancellation. HTTP tests cover every fail-closed path
+(credentials, Host, path, method, configuration) and check that concurrent
+clients share one browser refresh and cursor computation. These tests do not access a personal account.
 
 ## Browser session boundary
 
 Authentication is lazy: the first read acquires
-cookies from an existing page in Neko Chromium's default context over CDP.
+cookies from an existing page in the browser's default context over CDP.
 Only cookies applicable to `https://www.youtube.com/` enter the in-memory
 YouTube.js session. No cookie file, profile database, or disk authentication
 cache is used. HttpOnly cookies are supported without executing page JavaScript.
@@ -153,13 +201,14 @@ Only HTTP(S) origins are accepted; credentials, path prefixes, query strings,
 and fragments are rejected. Tools cannot override the endpoint. CDP discovery
 redirects are rejected and WebSocket authority is checked. See [UPSTREAM.md](UPSTREAM.md).
 
-Malt exposes CDP on its own loopback `127.0.0.1:9222`. That is not the developer
-machine's loopback. Remote execution requires an operator-managed SSH tunnel
-or running alongside Neko. This package does not create tunnels, expose ports,
-change firewall rules, or deploy Neko. Never expose CDP publicly. Neko UI login
-through Kanidm is separate from the YouTube login and CDP access controls.
+Any Chromium-based browser with remote debugging enabled works. Run the
+server on the browser's host so CDP stays on loopback, or reach a remote
+browser through an operator-managed SSH tunnel. This package does not create
+tunnels, change firewall rules, or manage the browser; the HTTP listener is
+the only port it opens. Never expose CDP publicly: it grants full control of
+the browser, not only cookie reads.
 
-On `AUTH_REQUIRED`, open Neko manually and sign into the intended default
+On `AUTH_REQUIRED`, open the browser manually and sign into the intended default
 YouTube account. Keep an existing default-context page open. There is no
 automatic login, tab creation, navigation, or account switching. A stable
 channel ID must be readable; missing/ambiguous identity fails closed.
@@ -180,7 +229,7 @@ underlying privileges. No raw CDP/API or mutating tools are exposed.
 ## Opt-in live read check
 
 Do not run this without the account owner's explicit approval. After logging
-into YouTube in Neko, run the check through the actual stdio MCP client. It
+into YouTube in the browser, run the check through the actual stdio MCP client. It
 requests five items per tool, chooses a playlist ID from the first response
 (or WL if none is listed), and checks account consistency across responses.
 No manual channel or playlist ID is required. Short lists may return fewer
@@ -198,8 +247,10 @@ bun run test:live
 ```
 
 Without opt-in the command exits before loading the reader or contacting CDP.
+`test:live` drives the stdio transport; the HTTP check used a throwaway
+JSON-RPC client with the same output limits.
 It is not a `*.test.ts` file and is excluded from the default test command.
-The default suite uses local protocol fixtures, not Neko or YouTube.
+The default suite uses local protocol fixtures, not a browser or YouTube.
 See [VERIFICATION.md](VERIFICATION.md) for recorded verification limits.
 
 ## Logging and audit
@@ -340,6 +391,7 @@ fixtures, including cancellation, timeout, account changes, and secret-safe
 failures. This is not proof that a personal account's current YouTube response
 matches those fixtures. Unsupported structures fail closed.
 
-HTTP deployment, Nix application packaging, and all writes are separate
-changes. Live read-only testing requires explicit approval and is not part
+The HTTP transport is verified locally and in one live check; deployment
+behind a reverse proxy and all writes are separate changes. Nix packaging
+lives in `nix/youtube.nix`. Live read-only testing requires explicit approval and is not part
 of the default suite.
