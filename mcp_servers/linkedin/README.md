@@ -4,7 +4,7 @@ A stdio MCP server that reads LinkedIn profiles through a Chromium session manag
 
 ## Usage
 
-Sign in to LinkedIn through Neko first. The MCP does not install or launch a browser or create cookie files.
+Sign in to LinkedIn through Neko first. The MCP does not install or launch a browser or export login cookies for a separate HTTP API client.
 
 ```sh
 uv sync --all-packages --python 3.13
@@ -36,6 +36,21 @@ Upstream saved-account selection and subsequent navigation back to the profile a
 The MCP creates a dedicated tab in the existing context and serializes lookups. Shutdown and request cancellation release only that tab and the client connection, preserving user tabs, the browser, and its login session. Connection loss fails the in-flight request; the next explicit request reconnects. Failed requests are never replayed automatically.
 
 The application does not guess ownership to remove tabs left behind after disconnection. Connection errors omit endpoint passwords and tokens and suggest checking discovery addresses and relay availability.
+
+## Diagnostics for personal use
+
+This wrapper permits upstream diagnostics and keeps the existing upstream progress callback. Diagnostic files, stderr logs, and progress may contain profile URLs, page text, screenshots, cookie-related metadata, local paths, or original exceptions. They are not a redacted audit channel. Stdout remains reserved for the MCP protocol.
+
+With the pinned upstream version:
+
+- `LINKEDIN_TRACE_MODE` defaults to `on_error`; `always` and `off` are also supported.
+- Trace directories are created under `~/.linkedin-mcp/trace-runs/run-*` by default. More generally, they are next to the source profile configured by upstream `USER_DATA_DIR` (default `~/.linkedin-mcp/profile`). This diagnostic source-profile setting is not the Neko profile and does not change the browser attached over CDP.
+- `LINKEDIN_DEBUG_TRACE_DIR` selects an explicit trace directory and takes precedence even when trace mode is `off`.
+- Section failure reports are written into the trace directory, or into `~/.linkedin-mcp/issue-reports` by default when tracing is off. **Trace off does not disable all diagnostic file writes.**
+
+Upstream's logging setup registers trace cleanup, but this wrapper does not call that setup or `teardown_trace_logging()`. Importing the extractor does not provide the upstream server's cleanup lifecycle: even default trace directories can remain after successful work. The wrapper supplies no separate diagnostic directory, permission policy, retention limit, rotation, or automatic deletion. Diagnostic write failures follow upstream error handling; they are not isolated by a dependency patch. Review storage and access according to your personal deployment needs.
+
+Tests characterize trace-directory allocation and failure-report writing in temporary HOME/XDG directories using synthetic inputs. Existing diagnostic artifacts are not opened or deleted by those tests. See [VERIFICATION.md](VERIFICATION.md) for the historical metadata inventory and the distinction between the former no-files requirement and the accepted personal-use behavior.
 
 ## Development checks
 
