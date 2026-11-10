@@ -9,7 +9,16 @@ import { YoutubeClient } from "../../src/youtube/client.ts";
 import { acquireCookies } from "../../src/auth/cdp.ts";
 
 export function libraryServer(
-  options: { pages?: number[]; now?: () => number; cookieValue?: string } = {},
+  options: {
+    pages?: number[];
+    now?: () => number;
+    cookieValue?: string;
+    // Answers non-browse (write) routes; without it they fail like before.
+    onWrite?: (
+      path: string,
+      body: Record<string, unknown>,
+    ) => Response | Promise<Response>;
+  } = {},
 ) {
   const browser = cdpFixture({
     cookies: [cookie({ value: options.cookieValue ?? "fixture-secret" })],
@@ -25,12 +34,16 @@ export function libraryServer(
     hostname: "127.0.0.1",
     port: 0,
     async fetch(req) {
-      paths.push(new URL(req.url).pathname);
+      const path = new URL(req.url).pathname;
+      paths.push(path);
       const body = await req.json();
       if (
-        req.method !== "POST" ||
-        new URL(req.url).pathname !== "/youtubei/v1/browse"
+        req.method === "POST" &&
+        path !== "/youtubei/v1/browse" &&
+        options.onWrite
       )
+        return options.onWrite(path, body);
+      if (req.method !== "POST" || path !== "/youtubei/v1/browse")
         return new Response(null, { status: 500 });
       if (body.browseId === "SPaccount_advanced")
         return Response.json(accountPage(accountId));

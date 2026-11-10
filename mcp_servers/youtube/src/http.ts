@@ -3,6 +3,8 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { ConfigError } from "./config.ts";
 import { createServer, type Reader } from "./server.ts";
 import type { Logger } from "./observability/logger.ts";
+import type { WriteGroup } from "./config.ts";
+import type { Writer } from "./writer.ts";
 
 export const endpoint = "/mcp";
 const tokenPattern = /^[\x21-\x7e]{32,}$/;
@@ -16,6 +18,8 @@ export interface HttpOptions {
   allowedHosts: string[];
   logger?: Logger | undefined;
   timeoutMs?: number | undefined;
+  writer?: Writer | undefined;
+  writes?: ReadonlySet<WriteGroup> | undefined;
 }
 
 export function validToken(token: string) {
@@ -79,6 +83,8 @@ export async function startHttp(reader: Reader, options: HttpOptions) {
       const mcp = createServer(reader, {
         logger: options.logger,
         timeoutMs: options.timeoutMs,
+        writer: options.writer,
+        writes: options.writes,
       });
       await mcp.connect(transport);
       // The transport ignores request.signal; closing the server aborts its handlers.

@@ -1,6 +1,6 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer, type Reader } from "./server.ts";
-import { createReader } from "./reader.ts";
+import { createBackend } from "./reader.ts";
 import { readFile } from "node:fs/promises";
 import {
   ConfigError,
@@ -71,7 +71,9 @@ export async function start(
     }
     // Logged so an operator can see from the journal whether writes are on.
     const started = writes.size ? { writes: [...writes] } : {};
-    const shared = reader ?? createReader();
+    // An injected reader (tests) runs read-only; otherwise reads and writes share one session.
+    const backend = reader ? { reader, writer: undefined } : createBackend();
+    const shared = backend.reader;
     let closing = false;
     let close = async () => {};
     const stop = async (reason: "SIGINT" | "SIGTERM" | "transport_closed") => {
@@ -96,12 +98,19 @@ export async function start(
         token,
         logger: diagnostics,
         timeoutMs: options.timeoutMs,
+        writer: backend.writer,
+        writes,
       }).catch(refuse);
       close = () => http.stop();
       diagnostics.emit({ event: "server.start", ...started });
       return;
     }
-    const server = createServer(shared, { ...options, logger: diagnostics });
+    const server = createServer(shared, {
+      ...options,
+      logger: diagnostics,
+      writer: backend.writer,
+      writes,
+    });
     close = () => server.close();
     server.server.onclose = () => {
       void stop("transport_closed");

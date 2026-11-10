@@ -7,7 +7,7 @@ import {
   type LogEvent,
 } from "./logger.ts";
 import { safeError, type ErrorCode } from "../errors.ts";
-import type { ToolName } from "../server.ts";
+import type { AnyToolName } from "../tools.ts";
 
 type Outcome = "ok" | "error" | "timeout" | "cancelled";
 type Caches = Pick<
@@ -196,8 +196,9 @@ export function recordCache<K extends keyof Caches>(
 
 export async function withRequest(
   logger: Logger | undefined,
-  tool: ToolName,
-  limit: number,
+  tool: AnyToolName,
+  // Writes have no page size.
+  limit: number | undefined,
   operation: () => Promise<Record<string, unknown>>,
 ): Promise<Record<string, unknown>> {
   if (!logger) return operation();
@@ -209,7 +210,7 @@ export async function withRequest(
       event: "request.end" as const,
       request_id,
       tool,
-      limit,
+      ...(limit === undefined ? {} : { limit }),
       duration_ms: Math.max(0, performance.now() - started),
       ...scope.caches,
     });

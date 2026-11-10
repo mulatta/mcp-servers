@@ -142,6 +142,23 @@ export class SessionProvider<T> {
     });
   }
 
+  // Writes are not idempotent, so unlike run() an authentication failure is not retried.
+  async once<R>(
+    signal: AbortSignal,
+    write: (snapshot: Snapshot<T>) => Promise<R>,
+  ): Promise<R> {
+    const snapshot = await this.get(signal);
+    signal.throwIfAborted();
+    this.assertAccountUnchanged();
+    try {
+      return await write(snapshot);
+    } catch (error) {
+      if (error instanceof SafeError && error.code === "AUTH_REQUIRED")
+        this.invalidate(snapshot);
+      throw error;
+    }
+  }
+
   async run<R>(
     signal: AbortSignal,
     continuation: boolean,

@@ -112,7 +112,19 @@ read-only, non-destructive annotations. No write or arbitrary API tools exist.
 Unset or empty keeps the server read-only. Any other value, including `all`
 beside a group name, refuses to start with `INVALID_WRITES`, so a typo cannot
 silently enable or drop a group. `server.start` lists the enabled groups. The
-flakelet module exposes the same list as `writes`. No group has tools yet.
+flakelet module exposes the same list as `writes`.
+
+| Group | Tool | Input | Destructive |
+| ---------- | ------------------------- | ------------------------------------------------------- | ----------- |
+| `playlist` | `youtube_create_playlist` | `title`, optional `privacy` (default `PRIVATE`), `description` | No |
+| `playlist` | `youtube_delete_playlist` | `playlist_id` (`PL…` only) | Yes |
+
+Write tools declare `readOnlyHint: false` and `idempotentHint: false`; deletes
+also declare `destructiveHint: true`. A write is sent once and never retried.
+If it was sent and YouTube did not refuse it with a client error, any later
+failure (timeout, dropped connection, server error, or a response without the
+expected fields) returns `WRITE_OUTCOME_UNKNOWN`: read the target before trying
+again. Diagnostics record the tool and outcome, never the IDs or titles.
 
 Example MCP call arguments:
 

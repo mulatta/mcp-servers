@@ -1,5 +1,20 @@
 # Verification record
 
+## Approved live playlist create/delete check: 2026-11-10
+
+With `YOUTUBE_WRITES=playlist`, the first live create returned
+`WRITE_OUTCOME_UNKNOWN` although the playlist was made: new playlist IDs are
+`PL` plus 11 characters, and the ID check expected at least 16 after `PL`
+(every older playlist on the account is `PL` plus 32). The tool reported the
+uncertain outcome as designed; the pattern now accepts both lengths, with a
+regression test. The two probe playlists left by that run were deleted with
+`youtube_delete_playlist`.
+
+After the fix, one private playlist was created, appeared in
+`youtube_list_playlists` after about 3.5 s, was deleted, and was gone from the
+list within 0.5 s. Reading the new, empty playlist returned `UPSTREAM_CHANGED`;
+see the next entry. No playlist ID or title is stored here.
+
 ## Approved live check of write configuration: 2026-11-10
 
 With `YOUTUBE_WRITES=all` against the same browser, `server.start` listed all

@@ -12,6 +12,8 @@ const messages = {
   UPSTREAM_CHANGED: "YouTube returned an unsupported response.",
   UPSTREAM_UNAVAILABLE: "YouTube data is currently unavailable.",
   TIMEOUT: "Request timed out.",
+  WRITE_OUTCOME_UNKNOWN:
+    "The change was sent but its result is unknown. Read the target before retrying.",
 } as const;
 export type ErrorCode = keyof typeof messages;
 

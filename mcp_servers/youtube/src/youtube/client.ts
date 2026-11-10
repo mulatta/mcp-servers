@@ -24,13 +24,22 @@ const routes = {
 } as const;
 export type Route = keyof typeof routes;
 
+// Tracks whether a write left the process and whether YouTube refused it outright.
+export type Attempt = { dispatched: boolean; rejected: boolean };
+
 const active = new AsyncLocalStorage<{
   signal: AbortSignal;
   paths: ReadonlySet<string>;
+  attempt: Attempt | undefined;
 }>();
-const scope = (signal: AbortSignal, granted: readonly Route[]) => ({
+const scope = (
+  signal: AbortSignal,
+  granted: readonly Route[],
+  attempt?: Attempt,
+) => ({
   signal,
   paths: new Set(granted.map((route) => routes[route])),
+  attempt,
 });
 
 export class YoutubeClient {
@@ -56,7 +65,7 @@ export class YoutubeClient {
             async (input: RequestInfo | URL, init?: RequestInit) => {
               const current = active.getStore();
               if (!current) throw new SafeError("UPSTREAM_UNAVAILABLE");
-              const { signal, paths } = current;
+              const { signal, paths, attempt } = current;
               signal.throwIfAborted();
               const request = new Request(input, {
                 ...init,
@@ -70,13 +79,22 @@ export class YoutubeClient {
                 !paths.has(url.pathname)
               )
                 throw new SafeError("UPSTREAM_UNAVAILABLE");
+              const writing = attempt && url.pathname !== routes.browse;
+              if (writing) attempt.dispatched = true;
               let response: Response;
               try {
                 response = await network(request);
               } catch {
                 throw new SafeError("UPSTREAM_UNAVAILABLE");
               }
-              await checkResponse(response);
+              try {
+                await checkResponse(response);
+              } catch (error) {
+                // Only a client-error status proves the write was refused, not applied.
+                if (writing && response.status >= 400 && response.status < 500)
+                  attempt.rejected = true;
+                throw error;
+              }
               return response;
             },
             {
@@ -164,10 +182,11 @@ export class YoutubeClient {
     signal: AbortSignal,
     operation: (client: Innertube) => Promise<T>,
     granted: readonly Route[] = ["browse"],
+    attempt?: Attempt,
   ): Promise<T> {
     signal.throwIfAborted();
     try {
-      return await active.run(scope(signal, granted), () =>
+      return await active.run(scope(signal, granted, attempt), () =>
         operation(this.client),
       );
     } catch (error) {

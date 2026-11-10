@@ -31,7 +31,16 @@ was accessed for this inspection.
   `LikeEndpoint` (`like/like`, `like/removelike`), `SubscribeEndpoint`,
   `UnsubscribeEndpoint` (`subscription/subscribe`, `subscription/unsubscribe`)
   and `ModifyChannelNotificationPreferenceEndpoint`
-  (`notification/modify_channel_preference`). No tool grants them yet.
+  (`notification/modify_channel_preference`).
+- `PlaylistManager.delete()` cannot be used in 18.3.0: the manager builds a
+  `deletePlaylistServiceEndpoint` with `sourcePlaylistId`, while
+  `DeletePlaylistEndpoint.buildRequest()` copies `sourcePlaylistId` only when a
+  `playlistId` field is present, so the request body carries no playlist. The
+  same code is on upstream `main` with no open issue or pull request. The
+  delete tool posts `{ playlistId }` to `playlist/delete` itself. Playlist
+  creation posts the `CreatePlaylistServiceEndpoint` body (`title`,
+  `privacyStatus`, `videoIds`, `description`) to `playlist/create` the same way,
+  so both writes are visible in one place.
 - `account.getInfo(true)` lists accounts using WEB and has `is_selected`, but
   `AccountItem` does not expose a stable channel ID as a dedicated field. Do not
   execute switch-account service endpoints to derive identity.

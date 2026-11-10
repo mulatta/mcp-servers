@@ -4,7 +4,7 @@ import type { Writable } from "node:stream";
 import { BoundedWriter } from "./writer.ts";
 import { writeGroups, type LogLevel } from "../config.ts";
 import { isErrorCode, type ErrorCode } from "../errors.ts";
-import { toolNames } from "../tools.ts";
+import { allToolNames } from "../tools.ts";
 
 export class CorrelationId {
   readonly value = crypto.randomUUID();
@@ -51,8 +51,8 @@ function events<T extends z.ZodType>(id: T) {
   const request = {
     event: z.literal("request.end"),
     request_id: id,
-    tool: z.enum(toolNames),
-    limit: z.number().int().min(1).max(100),
+    tool: z.enum(allToolNames),
+    limit: z.number().int().min(1).max(100).optional(),
     duration_ms: duration,
     ...caches,
   };
