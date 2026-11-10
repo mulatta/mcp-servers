@@ -173,6 +173,7 @@ export class YoutubeClient {
                 : name === "youtube_get_channel_videos"
                   ? "channel_videos"
                   : "videos",
+          { continuation: !!continuation },
         ),
       );
     });

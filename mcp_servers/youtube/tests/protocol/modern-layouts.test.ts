@@ -278,3 +278,39 @@ test("lockup videos read the channel from the first metadata row", () => {
     result.items.map((item) => "channel_name" in item && item.channel_name),
   ).toEqual(["Fixture channel", null]);
 });
+
+// Observed live on Watch Later page 2: the continuation response repeats an
+// empty tab shell in `contents` beside the appended items.
+test("continuation responses read appended items even beside a contents shell", () => {
+  const response = {
+    contents: {
+      twoColumnBrowseResultsRenderer: {
+        tabs: [{ tabRenderer: { selected: true } }],
+      },
+    },
+    alerts: [],
+    onResponseReceivedActions: [
+      {
+        appendContinuationItemsAction: {
+          continuationItems: [
+            {
+              playlistVideoRenderer: {
+                videoId: "v0000000001",
+                title: { simpleText: "Fixture" },
+                isPlayable: true,
+              },
+            },
+            {
+              continuationItemRenderer: { continuationEndpoint: continuation },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const page = normalize(response, "videos", { continuation: true });
+  expect(page.items.map((item) => "video_id" in item && item.video_id)).toEqual(
+    ["v0000000001"],
+  );
+  expect(page.continuation).toBe("fixture-next");
+});

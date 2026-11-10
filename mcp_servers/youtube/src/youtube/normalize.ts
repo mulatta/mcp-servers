@@ -249,7 +249,11 @@ function continuationToken(endpoint: unknown): string {
   return [...tokens][0]!;
 }
 
-export function normalize(raw: unknown, kind: Kind): Page {
+export function normalize(
+  raw: unknown,
+  kind: Kind,
+  options: { continuation?: boolean } = {},
+): Page {
   const page: Page = { items: [], continuation: null };
   let recognized = false;
   const videoId = /^[A-Za-z0-9_-]{11}$/;
@@ -453,7 +457,9 @@ export function normalize(raw: unknown, kind: Kind): Page {
     page.continuation = value;
   }
   const response = object(raw);
-  if (response.contents) walk(response.contents);
+  // Continuation answers may repeat an empty tab shell in `contents`; their
+  // items are only in the appended actions or `continuationContents`.
+  if (response.contents && !options.continuation) walk(response.contents);
   else if (response.continuationContents) walk(response.continuationContents);
   else {
     const actions =

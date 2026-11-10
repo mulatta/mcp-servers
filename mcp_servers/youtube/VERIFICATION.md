@@ -1,5 +1,14 @@
 # Verification record
 
+## Approved live paging check: 2026-11-10
+
+Reading Watch Later past its first page failed with `UPSTREAM_CHANGED`; a
+key-only scan showed the continuation response carrying an empty tab shell in
+`contents` beside `onResponseReceivedActions`. After the fix, paging with
+`limit: 100` read Watch Later to its end (22 pages), liked videos for 30 pages
+(the probe's cap), playlists (1 page) and subscriptions (4 pages) to their
+ends, with no error. Only counts were printed.
+
 ## Approved live empty-playlist read: 2026-11-10
 
 A newly created private playlist read back through `youtube_get_playlist` as
