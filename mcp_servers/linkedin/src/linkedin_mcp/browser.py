@@ -32,6 +32,16 @@ class BrowserConnectionError(RuntimeError):
         )
 
 
+class BrowserBusyError(RuntimeError):
+    """Reject work beyond one running and one waiting lookup per process."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "LinkedIn lookup is busy: one lookup is running and another is "
+            "waiting. Retry after one finishes."
+        )
+
+
 class BrowserSession:
     def __init__(self, endpoint: str) -> None:
         parsed = urlsplit(endpoint)
@@ -44,6 +54,7 @@ class BrowserSession:
         self._control: CDPSession | None = None
         self._target_id: str | None = None
         self._lock = asyncio.Lock()
+        self._admitted = 0
 
     async def _connect(self) -> BrowserContext:
         if self._browser is not None and not self._browser.is_connected():
@@ -110,6 +121,18 @@ class BrowserSession:
 
     @asynccontextmanager
     async def lease(self) -> AsyncIterator[Page]:
+        # The slot stays taken through cleanup, which runs while the lock is held.
+        if self._admitted >= 2:
+            raise BrowserBusyError()
+        self._admitted += 1
+        try:
+            async with self._owned_lease() as page:
+                yield page
+        finally:
+            self._admitted -= 1
+
+    @asynccontextmanager
+    async def _owned_lease(self) -> AsyncIterator[Page]:
         async with self._lock:
             try:
                 context = await self._connect()
