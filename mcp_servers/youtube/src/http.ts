@@ -66,36 +66,51 @@ export async function startHttp(reader: Reader, options: HttpOptions) {
     return rejection(status);
   };
 
+  const answer = async (request: Request): Promise<Response> => {
+    // Host first: a rebinding page must not learn whether a token is accepted.
+    if (!allowed.has(hostnameOf(request.headers.get("host"))))
+      return reject(403);
+    if (!authorized(request.headers.get("authorization"))) return reject(401);
+    if (new URL(request.url).pathname !== endpoint) return reject(404);
+    // Stateless mode answers each POST with JSON; there is no server-initiated stream to hold open.
+    if (request.method !== "POST") return reject(405);
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      enableJsonResponse: true,
+    });
+    const mcp = createServer(reader, {
+      logger: options.logger,
+      timeoutMs: options.timeoutMs,
+      writer: options.writer,
+      writes: options.writes,
+    });
+    await mcp.connect(transport);
+    // The transport ignores request.signal; closing the server aborts its handlers.
+    const disconnect = () => void mcp.close();
+    request.signal.addEventListener("abort", disconnect, { once: true });
+    try {
+      return await transport.handleRequest(request);
+    } finally {
+      request.signal.removeEventListener("abort", disconnect);
+      await mcp.close();
+    }
+  };
+
   const server = Bun.serve({
     hostname: options.hostname,
     port: options.port,
+    // Bun.serve has no keep-alive switch. A client that never closes
+    // half-closed keep-alive sockets exhausted the relay in front of this
+    // server, and stateless JSON answers gain nothing from reuse, so every
+    // response, including rejections, ends its connection.
     async fetch(request) {
-      // Host first: a rebinding page must not learn whether a token is accepted.
-      if (!allowed.has(hostnameOf(request.headers.get("host"))))
-        return reject(403);
-      if (!authorized(request.headers.get("authorization"))) return reject(401);
-      if (new URL(request.url).pathname !== endpoint) return reject(404);
-      // Stateless mode answers each POST with JSON; there is no server-initiated stream to hold open.
-      if (request.method !== "POST") return reject(405);
-      const transport = new WebStandardStreamableHTTPServerTransport({
-        enableJsonResponse: true,
+      const response = await answer(request);
+      const headers = new Headers(response.headers);
+      headers.set("connection", "close");
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
       });
-      const mcp = createServer(reader, {
-        logger: options.logger,
-        timeoutMs: options.timeoutMs,
-        writer: options.writer,
-        writes: options.writes,
-      });
-      await mcp.connect(transport);
-      // The transport ignores request.signal; closing the server aborts its handlers.
-      const disconnect = () => void mcp.close();
-      request.signal.addEventListener("abort", disconnect, { once: true });
-      try {
-        return await transport.handleRequest(request);
-      } finally {
-        request.signal.removeEventListener("abort", disconnect);
-        await mcp.close();
-      }
     },
   });
   const host = options.hostname.includes(":")

@@ -84,7 +84,10 @@ Every request gets a fresh MCP server; all requests share one browser session,
 so concurrent clients share one refresh and one cursor store. Cursors work
 across clients but compete for the same 128-entry limit, and an authentication
 failure in any request expires every outstanding cursor. A client that
-disconnects cancels its request.
+disconnects cancels its request. Every response, including rejections, carries
+`Connection: close` and ends its connection: answers are stateless JSON, and a
+client that left half-closed keep-alive sockets open once exhausted the file
+descriptors of the relay in front of the server.
 
 Client configuration (Claude Code):
 
