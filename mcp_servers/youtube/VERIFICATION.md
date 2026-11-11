@@ -37,6 +37,31 @@ public through an update),
 dislike, 5xx answers or refusals of live writes, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
 
+## End to end on the test account: 2026-11-11
+
+`bun run live:test --writes` ran the restructured suite against the test
+account in the local test browser: 26 tests passed in about 172 s, and the
+browser was stopped afterwards. The end-to-end file cleared the account,
+read every list empty, wrote through every write tool, read each write back,
+and cleared the account again. Earlier runs while the suite took shape showed
+four behaviours it now accounts for:
+
+- The library lists Watch Later and liked videos as playlists once they have
+  held anything, also after they are emptied again; only PL playlists can be
+  deleted.
+- Watch Later puts each added batch on top, in the batch's own order.
+- A new playlist's details read as unavailable for a few seconds.
+- Subscribing to a channel again within a second of the first call returned
+  `WRITE_OUTCOME_UNKNOWN` three runs in a row, while the same calls outside
+  the suite were confirmed; the response was not recorded. Repeating once the
+  subscription list shows the channel is confirmed.
+
+In one early run, entries removed during the first clear (and a removed like)
+were back by the end, although the removals had been confirmed and the reads
+had shown them gone. The same removals made alone stayed removed for four
+minutes, and later runs did not repeat it; each clear now checks again after
+20 seconds.
+
 ## Empty test account: 2026-11-11
 
 A new test account with a channel and nothing else was read with every list
@@ -52,6 +77,15 @@ Later, liked videos and playlists were already read as empty. Later the
 account's own channel, before its first upload, failed the same way in
 `youtube_get_channel_videos`: the owner sees one tab without an endpoint
 holding an upload prompt. It now reads as no uploads.
+
+## Live feature tests: 2026-11-11
+
+The new `tests/live` suite ran against the signed-in browser with
+`YOUTUBE_LIVE=1 YOUTUBE_LIVE_WRITES=1`: 18 tests passed in about 222 s (6
+reads, 7 playlist writes in a deleted test playlist, 5 account writes that
+restored Watch Later, ratings, subscriptions and the bell). Without
+`YOUTUBE_LIVE=1` all of them were skipped, and a plain `bun test` ran only the
+protocol suite.
 
 ## Approved live subscription feed check: 2026-11-11
 

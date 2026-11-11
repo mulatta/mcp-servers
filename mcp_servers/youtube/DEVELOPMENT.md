@@ -41,10 +41,7 @@ codes and timings:
 YOUTUBE_LIVE_READONLY=1 YOUTUBE_CDP_URL=http://127.0.0.1:9222 bun run test:live
 ```
 
-Without the opt-in it exits before contacting CDP. Write checks are run as
-throwaway probes that work in a new private playlist, or on a video, channel
-or setting chosen so the account ends as it started; they print flags,
-counts and timings only. [VERIFICATION.md](VERIFICATION.md) records each run.
+Without the opt-in it exits before contacting CDP.
 
 ### Test browser
 
@@ -88,6 +85,65 @@ container and DevTools are up, `check` reads the signed-in account and lists
 the `.env.test` keys it would change (`check --write` applies them), `down`
 stops the container and keeps the profile, and `down --purge` deletes the
 profile too.
+
+### Live feature tests
+
+`tests/live/` exercises the features themselves against the test account.
+The Nix build runs only `tests/protocol`, so these tests never run there.
+`bun run live:test` starts the test browser, confirms it holds
+`YOUTUBE_LIVE_ACCOUNT_ID`, runs the suite against it, and stops the browser
+again, also on failure or Ctrl-C:
+
+```sh
+bun run live:test                      # reads only
+bun run live:test --writes             # reads and writes; clears the test account
+bun run live:test --writes -- e2e      # one file; arguments after -- go to bun test
+```
+
+`--keep` leaves the browser running. Setting `YOUTUBE_LIVE_LOG` to a file
+collects the servers' debug logs there, which carry stages and safe codes but
+no IDs. The suite can also run directly with `bun run test:live:features` and
+`YOUTUBE_LIVE=1` (plus `YOUTUBE_LIVE_WRITES=1`); without `YOUTUBE_LIVE=1`
+every live test is skipped, so a plain `bun test` stays offline.
+
+Writes refuse to start without both `YOUTUBE_LIVE_ACCOUNT_ID`, the test
+account, and `YOUTUBE_LIVE_PERSONAL_ACCOUNT_ID`, an account they must never
+change, or when the two are equal. Every file reads the account first and
+stops before any write, including cleanup, if the browser is signed into the
+personal account or any account other than the pinned one.
+
+The write suite, `e2e.test.ts`, owns the test account's state and starts from
+nothing rather than from prepared data:
+
+1. It clears the account with the removal tools (deletes its playlists,
+   empties Watch Later, removes likes, unsubscribes) and checks that every
+   list reads empty, again after 20 seconds.
+1. It subscribes to two public Google channels, reads them and the
+   subscription feed back, and cycles one channel's bell; an unfollowed
+   channel is refused.
+1. It likes videos, including one twice, and removes a rating twice.
+1. It adds 105 public uploads to Watch Later in batches of 50, reads every
+   page in order, moves an entry to the top and back, and removes some.
+1. It creates a private playlist, changes its title, description and
+   privacy, adds, moves and removes videos, checks the not-found and
+   ambiguous-move refusals, and deletes it.
+1. It plays one video in the test browser and finds it at the top of the
+   watch history, which no tool writes or clears.
+1. It clears the account again; `afterAll` repeats that after a failure.
+
+Videos come from a public channel's uploads, so the suite needs nothing on
+the account to start. Reads (`reads.test.ts`) check what holds on any
+account: every list tool's limit and account, a public channel's uploads,
+playlist details and an unknown channel. Over HTTP, with a throwaway token on
+a free loopback port, the suite checks `initialize` instructions, the tool
+list, a read, a refused token, `Connection: close` with the socket closed,
+and a playlist write cycle. With writes enabled it also reproduces
+`WRITE_OUTCOME_UNKNOWN`: an in-process server whose network wrapper lets a
+create and an add reach YouTube, then drops or delays their answers, must
+report the outcome as unknown while the playlist and the added video exist.
+A full run with writes takes about three minutes. Assertions compare booleans
+and counts, so a failure names the step but never prints IDs or titles.
+[VERIFICATION.md](VERIFICATION.md) records each run.
 
 ## External latency verification
 

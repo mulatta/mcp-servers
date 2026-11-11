@@ -19,6 +19,10 @@ browser again. --keep leaves it running.
   up               start the test browser (pulls the pinned image once)
   status           show whether the browser and DevTools are up
   check [--write]  confirm the test account; --write records it in .env.test
+  test [--writes] [--keep] [-- <bun test args>]
+                   run tests/live against the test browser, starting and
+                   stopping it around the run; --writes includes write tests,
+                   which clear and rebuild the test account
   down [--purge]   stop the browser; --purge also deletes its profile`;
 
 const env = liveEnv(process.env);
@@ -116,6 +120,52 @@ Every port binds to 127.0.0.1. To view from another machine, forward TCP
 ports ${neko.uiPort} (UI) and ${neko.mediaPort} (video) to the same ports there.
 `;
 
+/** Runs `work` with the browser up, stopping it after if this started it. */
+async function withBrowser<T>(work: () => Promise<T>, keep: boolean) {
+  const started = !(await running(neko));
+  const stop = async () => {
+    if (!started || keep) return;
+    await down(neko, false);
+    console.log(`${neko.name}: stopped`);
+  };
+  for (const signal of ["SIGINT", "SIGTERM"] as const)
+    process.once(signal, () => {
+      void stop().finally(() => process.exit(130));
+    });
+  try {
+    if (started) await start();
+    return await work();
+  } finally {
+    await stop();
+  }
+}
+
+async function runTests(writes: boolean, extra: string[]) {
+  const state = await accountProbe(cdpUrl, env.personalAccountId, connect)();
+  if (state.state !== "ready" || state.accountId !== env.accountId) {
+    console.log(
+      state.state === "ready"
+        ? "account: not YOUTUBE_LIVE_ACCOUNT_ID; run live:setup"
+        : `account: ${describe(state)}`,
+    );
+    return 1;
+  }
+  // Bun ORs path filters, so a given filter replaces the whole directory.
+  const paths = extra.some((arg) => !arg.startsWith("-")) ? [] : ["tests/live"];
+  const child = Bun.spawn([process.execPath, "test", ...paths, ...extra], {
+    cwd: new URL("../..", import.meta.url).pathname,
+    env: {
+      ...process.env,
+      YOUTUBE_LIVE: "1",
+      YOUTUBE_LIVE_WRITES: writes ? "1" : "",
+      // The tests drive this browser, whatever .env.test names.
+      YOUTUBE_LIVE_CDP_URL: cdpUrl,
+    },
+    stdio: ["inherit", "inherit", "inherit"],
+  });
+  return child.exited;
+}
+
 async function guided(minutes: number, keep: boolean) {
   if (!env.personalAccountId)
     throw new Error(
@@ -193,6 +243,16 @@ switch (command) {
   case "check":
     process.exitCode = (await check(rest.includes("--write"))) ? 0 : 1;
     break;
+  case "test": {
+    const split = rest.indexOf("--");
+    const extra = split < 0 ? [] : rest.slice(split + 1);
+    const flags = split < 0 ? rest : rest.slice(0, split);
+    process.exitCode = await withBrowser(
+      () => runTests(flags.includes("--writes"), extra),
+      flags.includes("--keep"),
+    );
+    break;
+  }
   case "status":
     process.exitCode = (await status()) ? 0 : 1;
     break;

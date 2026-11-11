@@ -12,7 +12,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "bun run typecheck && bun run format:check",
-    "live:setup": "bun --env-file=.env.test tests/live/setup.ts"
+    "test:live:features": "bun test tests/live",
+    "live:setup": "bun --env-file=.env.test tests/live/setup.ts",
+    "live:test": "bun --env-file=.env.test tests/live/setup.ts test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
