@@ -1,4 +1,10 @@
 import { getEvent, listCalendars, searchEvents } from "./calendar.ts";
+import { createEvent, deleteEvent, updateEvent } from "./calendar-write.ts";
+import {
+  createContact,
+  deleteContact,
+  updateContact,
+} from "./contact-write.ts";
 import { getContact, listAddressBooks, searchContacts } from "./contacts.ts";
 import type { Tool } from "./define.ts";
 import {
@@ -66,4 +72,10 @@ export const tools: Tool[] = [
   activateSieveScript,
   deleteSieveScript,
   setVacation,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  createContact,
+  updateContact,
+  deleteContact,
 ];
