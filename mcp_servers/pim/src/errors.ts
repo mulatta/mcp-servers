@@ -9,6 +9,8 @@ const messages = {
     "Events with participants are not written: saving one would send invitations. Nothing was changed.",
   NOT_A_DRAFT:
     "The email is not a draft in the Drafts mailbox. Nothing was changed.",
+  NOT_IN_TRASH:
+    "Only emails that are solely in Trash or Junk can be destroyed. Trash them first. Nothing was changed.",
   MAILBOX_NOT_EMPTY:
     "The mailbox still holds emails or child mailboxes. Nothing was changed.",
   WRITE_REJECTED: "The mail server refused the change. Nothing was changed.",
