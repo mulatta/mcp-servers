@@ -1,6 +1,9 @@
+import { getEvent, listCalendars, searchEvents } from "./calendar.ts";
+import { getContact, listAddressBooks, searchContacts } from "./contacts.ts";
 import type { Tool } from "./define.ts";
 import { listMailboxes } from "./mailboxes.ts";
 import { getEmail, getThread, listIdentities, searchEmails } from "./mail.ts";
+import { getSieveScript, getVacation, listSieveScripts } from "./settings.ts";
 
 export const tools: Tool[] = [
   listMailboxes,
@@ -8,4 +11,13 @@ export const tools: Tool[] = [
   getEmail,
   getThread,
   listIdentities,
+  listCalendars,
+  searchEvents,
+  getEvent,
+  listAddressBooks,
+  searchContacts,
+  getContact,
+  getVacation,
+  listSieveScripts,
+  getSieveScript,
 ];

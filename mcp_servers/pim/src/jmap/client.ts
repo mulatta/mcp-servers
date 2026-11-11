@@ -12,6 +12,7 @@ export const using = {
   sieve: "urn:ietf:params:jmap:sieve",
   calendars: "urn:ietf:params:jmap:calendars",
   contacts: "urn:ietf:params:jmap:contacts",
+  blob: "urn:ietf:params:jmap:blob",
 } as const;
 export type Capability = Exclude<keyof typeof using, "core">;
 

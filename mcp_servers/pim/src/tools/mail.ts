@@ -2,7 +2,7 @@ import { z } from "zod";
 import { SafeError } from "../errors.ts";
 import { decodeCursor, nextCursor } from "./cursor.ts";
 import { tool } from "./define.ts";
-import { expect, id } from "./schema.ts";
+import { expect, getList, id, queryPage, trueKeys, utcDate } from "./schema.ts";
 import { htmlToText } from "./text.ts";
 
 /** Bulwark stores its tags as the keyword `$label:<id>`. */
@@ -45,10 +45,6 @@ const emailSummary = z.object({
   hasAttachment: z.boolean(),
   size: z.number().int().nonnegative(),
 });
-const emailList = z.object({
-  list: z.array(z.unknown()),
-  notFound: z.array(z.string()).nullable().optional(),
-});
 
 const people = (list: z.infer<typeof addresses>) =>
   (list ?? []).map((entry) => ({
@@ -65,9 +61,7 @@ export function summarize(value: unknown) {
   return {
     email_id: email.id,
     thread_id: email.threadId,
-    mailbox_ids: Object.keys(email.mailboxIds).filter(
-      (key) => email.mailboxIds[key],
-    ),
+    mailbox_ids: trueKeys(email.mailboxIds),
     from: people(email.from),
     to: people(email.to),
     subject: email.subject,
@@ -90,10 +84,6 @@ export function summarize(value: unknown) {
       .sort(),
   };
 }
-
-const utcDate = z.iso
-  .datetime({ offset: true })
-  .transform((value) => new Date(value).toISOString().replace(".000Z", "Z"));
 
 const searchInput = {
   mailbox_id: id.optional(),
@@ -138,12 +128,6 @@ function filterOf(input: SearchInput) {
   return conditions.length ? { operator: "AND", conditions } : null;
 }
 
-const queryResult = z.object({
-  ids: z.array(z.string()),
-  position: z.number().int().nonnegative(),
-  total: z.number().int().nonnegative().optional(),
-});
-
 export const searchEmails = tool({
   name: "pim_search_emails",
   description:
@@ -174,8 +158,8 @@ export const searchEmails = tool({
       ],
       signal,
     );
-    const page = expect(queryResult, query);
-    const { list } = expect(emailList, get);
+    const page = expect(queryPage, query);
+    const { list } = expect(getList, get);
     const byId = new Map(
       list.map((entry) => [(entry as { id?: unknown }).id, entry]),
     );
@@ -256,7 +240,7 @@ export const getEmail = tool({
       ],
       signal,
     );
-    const { list } = expect(emailList, result);
+    const { list } = expect(getList, result);
     const value = list.find(
       (entry) => (entry as { id?: unknown }).id === input.email_id,
     );
@@ -331,7 +315,7 @@ export const getThread = tool({
     );
     if (!found) throw new SafeError("NOT_FOUND");
     const byId = new Map(
-      expect(emailList, get).list.map((entry) => [
+      expect(getList, get).list.map((entry) => [
         (entry as { id?: unknown }).id,
         entry,
       ]),
