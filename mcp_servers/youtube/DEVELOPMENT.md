@@ -46,6 +46,49 @@ throwaway probes that work in a new private playlist, or on a video, channel
 or setting chosen so the account ends as it started; they print flags,
 counts and timings only. [VERIFICATION.md](VERIFICATION.md) records each run.
 
+### Test browser
+
+Live feature tests run against a separate Google account in a local browser,
+so they never change your own account. `bun run live:setup` manages that
+browser: a rootless podman container from the same pinned Neko image as
+production, with every port bound to `127.0.0.1` and its profile under
+`$XDG_DATA_HOME/youtube-mcp/live-neko`. It needs podman with rootless support
+and pulls the image (about 1.5 GB) on the first start.
+
+1. Copy `.env.test.example` to `.env.test`. Change any port that collides on
+   the host; setup names a port that is already taken over TCP or UDP.
+1. Set `YOUTUBE_LIVE_PERSONAL_ACCOUNT_ID` to your own channel ID. Setup and
+   every live write refuse that account.
+1. Run `bun run live:setup`. It starts the browser, prints how to reach its
+   UI, and waits up to ten minutes (`--timeout <minutes>`) for the test
+   account, reporting what is missing as it goes.
+1. Open the UI, join with the admin password from the generated `neko.env`,
+   take control, and sign in to the test account on youtube.com.
+1. Create a YouTube channel for the test account (profile menu, then *Create
+   a channel*). Without one, the account has no channel ID and every read
+   fails with `AUTH_REQUIRED`.
+
+Once the browser holds the test account, setup records it in `.env.test`: it
+sets `YOUTUBE_LIVE_ACCOUNT_ID` and removes a `YOUTUBE_LIVE_CDP_URL` that names
+another browser, leaving other lines as they are. It then stops the browser,
+as it also does on timeout or Ctrl-C; the sign-in stays in the profile.
+`--keep` leaves the browser running. A profile that is already signed in
+finishes without instructions.
+
+The UI streams video over WebRTC from `127.0.0.1:<media port>`. Browsers
+refuse loopback WebRTC candidates by default, so joining succeeds but the
+screen never appears until the viewing browser allows them: set
+`media.peerconnection.ice.loopback` to `true` in Firefox's `about:config`, or
+start Chromium with `--allow-loopback-in-peer-connection`. From another
+machine, forward the UI port and the media port (TCP) to the same ports
+there.
+
+For manual work, `up` starts the browser, `status` shows whether the
+container and DevTools are up, `check` reads the signed-in account and lists
+the `.env.test` keys it would change (`check --write` applies them), `down`
+stops the container and keeps the profile, and `down --purge` deletes the
+profile too.
+
 ## External latency verification
 
 Use an existing MCP client and collect stderr separately; there is no

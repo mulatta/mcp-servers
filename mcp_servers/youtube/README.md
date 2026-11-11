@@ -16,7 +16,8 @@ MCP over stdio or authenticated HTTP.
 ## Development
 
 [DEVELOPMENT.md](DEVELOPMENT.md) covers the development shell, the protocol
-tests, live checks and latency measurement.
+tests, the live test browser and test account, live checks and latency
+measurement.
 
 ## Configuration
 
