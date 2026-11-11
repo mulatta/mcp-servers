@@ -54,6 +54,9 @@
           youtube = pkgs.callPackage ./nix/youtube.nix {
             bun2nixLib = (bun2nix.overlays.default pkgs pkgs).bun2nix;
           };
+          pim = pkgs.callPackage ./nix/pim.nix {
+            bun2nixLib = (bun2nix.overlays.default pkgs pkgs).bun2nix;
+          };
         }
       );
 
@@ -71,6 +74,7 @@
       # Run on a host with flakelet (https://github.com/Mic92/flakelet): the
       # server updates from this flake independently of the host system.
       flakelets.youtube = import ./nix/flakelet-youtube.nix { inherit bun2nix; };
+      flakelets.pim = import ./nix/flakelet-pim.nix { inherit bun2nix; };
 
       checks = eachSystem (
         system:
@@ -96,8 +100,33 @@
                 allowedHosts = [ flakeletTest.host ];
               };
             };
+            # Test-only credential; the VM's Stalwart holds no real account.
+            pimTest = {
+              tokenFile = "/etc/pim-mcp-token";
+              token = "flakelet-vm-test-token-pim-0123456789abcdef";
+            };
+            pimArtifact = flakelet.lib.buildArtifact pkgsFor.${system} {
+              name = "pim-mcp";
+              module = self.flakelets.pim;
+              settings = {
+                inherit (pimTest) tokenFile;
+                serverUrl = "http://127.0.0.1:8080";
+                writes = [ "all" ];
+              };
+            };
           in
           {
+            flakelet-pim = pimArtifact;
+            vm-flakelet-pim = pkgsFor.${system}.testers.runNixOSTest (
+              import ./nix/flakelet-pim-test.nix (
+                pimTest
+                // {
+                  artifact = pimArtifact;
+                  inherit (packages.${system}.pim) driver;
+                  flakeletModule = flakelet.nixosModules.flakelet;
+                }
+              )
+            );
             flakelet-youtube = artifact;
             vm-flakelet-youtube = pkgsFor.${system}.testers.runNixOSTest (
               import ./nix/flakelet-youtube-test.nix (

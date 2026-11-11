@@ -19,4 +19,8 @@ in
   youtube = pkgs.mkShellNoCC {
     packages = [ pkgs.bun ];
   };
+
+  pim = pkgs.mkShellNoCC {
+    packages = [ pkgs.bun ];
+  };
 }
