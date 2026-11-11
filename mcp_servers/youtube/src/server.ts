@@ -55,7 +55,7 @@ export const instructions = [
   "After a write, lists show the change only after a delay (playlists a few seconds, Watch Later up to ~20 s, likes and subscriptions ~6 s); re-read without an old cursor and retry the read, not the write.",
   "WRITE_OUTCOME_UNKNOWN means the write may have happened: read the target first, because repeating a create or add makes duplicates.",
   "Removing a video removes all its entries in that playlist.",
-  "Moves need the video that should precede; they cannot move to the top.",
+  "Moves name the video to follow (after_video_id) or to precede (before_video_id); before_video_id with the first video moves to the top.",
   "Notification bells exist only for subscribed channels.",
   "Use video and channel IDs from read results, never from URLs.",
 ].join(" ");
@@ -274,14 +274,20 @@ const writeTools: Record<
   },
   youtube_move_in_playlist: {
     description:
-      "Move a video in a PL playlist or Watch Later (WL) so it sits directly after after_video_id; moving to the top is not possible. Fails without changing anything if either video is missing or listed twice, or the playlist exceeds ~6000 entries.",
+      "Move a video in a PL playlist or Watch Later (WL) so it sits directly after after_video_id or directly before before_video_id; give exactly one. To move to the top, pass the current first video as before_video_id. Fails without changing anything if a video is missing or listed twice, or the playlist exceeds ~6000 entries.",
     input: {
       playlist_id: editablePlaylist,
       video_id: videoId,
-      after_video_id: videoId,
+      after_video_id: videoId.optional(),
+      before_video_id: videoId.optional(),
     },
     destructive: false,
-    check: (input) => input.video_id !== input.after_video_id,
+    check: (input) => {
+      const anchors = [input.after_video_id, input.before_video_id].filter(
+        (id) => id !== undefined,
+      );
+      return anchors.length === 1 && anchors[0] !== input.video_id;
+    },
   },
   youtube_like_video: {
     description:

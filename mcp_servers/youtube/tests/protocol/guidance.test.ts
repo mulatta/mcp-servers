@@ -50,8 +50,9 @@ test("write tool descriptions carry the caveats a caller must know", async () =>
         /Watch Later/,
       ],
       youtube_move_in_playlist: [
-        /directly after/,
-        /top is not possible/,
+        /after_video_id/,
+        /before_video_id/,
+        /to the top/,
         /listed twice/,
       ],
       youtube_update_playlist: [/privacy/, /PRIVATE, UNLISTED or PUBLIC/],
@@ -102,7 +103,7 @@ test("server instructions describe the whole write flow", async () => {
       /WRITE_OUTCOME_UNKNOWN means the write may have happened/,
       /duplicates/,
       /removes all its entries/,
-      /cannot move to the top/,
+      /before_video_id with the first video moves to the top/,
       /only for subscribed channels/,
     ])
       expect(instructions).toMatch(pattern);

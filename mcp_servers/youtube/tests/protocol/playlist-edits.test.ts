@@ -142,6 +142,13 @@ test("move input is checked before any request", async () => {
     { playlist_id: playlist, video_id: v(1), after_video_id: v(1) },
     { playlist_id: playlist, video_id: "short", after_video_id: v(2) },
     { playlist_id: playlist, video_id: v(1) },
+    {
+      playlist_id: playlist,
+      video_id: v(1),
+      after_video_id: v(2),
+      before_video_id: v(3),
+    },
+    { playlist_id: playlist, video_id: v(1), before_video_id: v(1) },
   ])
     expect((await call("youtube_move_in_playlist", args)).code).toBe("invalid");
   expect(writes).toEqual([]);
@@ -176,6 +183,52 @@ test("move finds both entries across pages and sends one set-ID edit", async () 
       }),
     },
   ]);
+});
+
+// ytmusicapi moves with ACTION_MOVE_VIDEO_BEFORE; naming the first entry as the
+// successor moves a video to the top, which ACTION_MOVE_VIDEO_AFTER cannot do.
+test("move before another video sends the successor's set ID", async () => {
+  const { call, writes } = await connect();
+  const { result } = await call("youtube_move_in_playlist", {
+    playlist_id: playlist,
+    video_id: v(4),
+    before_video_id: v(0),
+  });
+  expect(result.structuredContent).toEqual({
+    account_id: "UCaaaaaaaaaaaaaaaaaaaaaa",
+    playlist_id: playlist,
+    video_id: v(4),
+    before_video_id: v(0),
+  });
+  expect(writes).toEqual([
+    {
+      path: "/youtubei/v1/browse/edit_playlist",
+      body: expect.objectContaining({
+        playlistId: playlist,
+        actions: [
+          {
+            action: "ACTION_MOVE_VIDEO_BEFORE",
+            setVideoId: "set-4",
+            movedSetVideoIdSuccessor: "set-0",
+          },
+        ],
+      }),
+    },
+  ]);
+});
+
+test("a missing successor is refused without an edit", async () => {
+  const { call, writes } = await connect();
+  expect(
+    (
+      await call("youtube_move_in_playlist", {
+        playlist_id: playlist,
+        video_id: v(1),
+        before_video_id: v(9),
+      })
+    ).code,
+  ).toBe("PLAYLIST_ITEM_NOT_FOUND");
+  expect(writes).toEqual([]);
 });
 
 test("a video missing from the playlist is refused without an edit", async () => {

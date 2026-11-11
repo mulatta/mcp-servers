@@ -186,17 +186,25 @@ const operations: Record<WriteToolName, Operation> = {
       locate(
         client,
         input.playlist_id as string,
-        [input.video_id as string, input.after_video_id as string],
+        [input.video_id as string, anchor(input)],
         signal,
       ),
+    // AFTER names the entry to follow; BEFORE (as ytmusicapi sends it) names the
+    // entry to precede, which is the only way to reach the top.
     body: (input, prepared) => ({
       playlistId: input.playlist_id,
       actions: [
-        {
-          action: "ACTION_MOVE_VIDEO_AFTER",
-          setVideoId: prepared[input.video_id as string],
-          movedSetVideoIdPredecessor: prepared[input.after_video_id as string],
-        },
+        input.after_video_id === undefined
+          ? {
+              action: "ACTION_MOVE_VIDEO_BEFORE",
+              setVideoId: prepared[input.video_id as string],
+              movedSetVideoIdSuccessor: prepared[anchor(input)],
+            }
+          : {
+              action: "ACTION_MOVE_VIDEO_AFTER",
+              setVideoId: prepared[input.video_id as string],
+              movedSetVideoIdPredecessor: prepared[anchor(input)],
+            },
       ],
     }),
     result: (data, input) => {
@@ -204,7 +212,9 @@ const operations: Record<WriteToolName, Operation> = {
       return {
         playlist_id: input.playlist_id,
         video_id: input.video_id,
-        after_video_id: input.after_video_id,
+        ...(input.after_video_id === undefined
+          ? { before_video_id: input.before_video_id }
+          : { after_video_id: input.after_video_id }),
       };
     },
   },
@@ -360,6 +370,10 @@ function menuParams(renderer: unknown, icon: string): string | undefined {
   };
   visit(renderer, 0);
   return found.length === 1 ? found[0] : undefined;
+}
+
+function anchor(input: WriteInput): string {
+  return (input.after_video_id ?? input.before_video_id) as string;
 }
 
 function succeeded(data: Record<string, unknown>) {

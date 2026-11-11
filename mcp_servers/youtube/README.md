@@ -205,7 +205,7 @@ drop a group. A tool whose group is off is neither listed nor callable.
 | `playlist` | `youtube_add_to_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | No |
 | `playlist` | `youtube_remove_from_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | Yes |
 | `playlist` | `youtube_update_playlist` | `playlist_id` (`PL…`), any of `title`, `description`, `privacy` | No |
-| `playlist` | `youtube_move_in_playlist` | `playlist_id` (`PL…` or `WL`), `video_id`, `after_video_id` | No |
+| `playlist` | `youtube_move_in_playlist` | `playlist_id` (`PL…` or `WL`), `video_id`, one of `after_video_id` or `before_video_id` | No |
 | `rating` | `youtube_like_video` | `video_id` | No |
 | `rating` | `youtube_remove_rating` | `video_id` | Yes |
 | `subscription` | `youtube_subscribe` | `channel_id` | No |
@@ -252,8 +252,9 @@ read them.
   channel's own bell menu.
 
 - **Removal is by video ID** and removes every entry of that video in the
-  playlist, including duplicates. Moving to the very top is not supported:
-  name the video it should follow.
+  playlist, including duplicates. A move names the video to follow
+  (`after_video_id`) or to precede (`before_video_id`); passing the current
+  first video as `before_video_id` moves to the top.
 
 - **Results** name the target and the new state, for example
   `{ "account_id", "playlist_id", "video_ids" }` or
@@ -361,7 +362,7 @@ All 19 tools were checked live on one account on 2026-11-10 and 2026-11-11.
 | Area | Checked live | Not checked live |
 | --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | reads | five items per tool; full paging of Watch Later, playlists, subscriptions; new fields populated; unknown and upload-less channels | accounts with no subscriptions |
-| playlists | create (private; unlisted with description, both read back), delete, add/remove 1–50 videos, rename, privacy changes read back, move in a playlist and in Watch Later, not-found and duplicate refusals | creating a playlist as public in one call, `PLAYLIST_TOO_LONG` |
+| playlists | create (private; unlisted with description, both read back), delete, add/remove 1–50 videos, rename, privacy changes read back, move (including to the top) in a playlist and in Watch Later, not-found and duplicate refusals | creating a playlist as public in one call, `PLAYLIST_TOO_LONG` |
 | ratings | like and removal on a video that was not liked | removing a dislike |
 | subscriptions | subscribe and unsubscribe a channel that was not followed | — |
 | bells | all, none and personalized on one channel; refusal for an unfollowed channel | — |

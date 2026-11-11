@@ -148,13 +148,16 @@ Bodies are built here, never by the YouTube.js managers.
 | delete playlist | `playlist/delete` | `playlistId` | none beyond a 2xx answer |
 | add, remove videos | `browse/edit_playlist` | `playlistId`, one `ACTION_ADD_VIDEO` / `ACTION_REMOVE_VIDEO_BY_VIDEO_ID` per video | `status: STATUS_SUCCEEDED` |
 | update playlist | `browse/edit_playlist` | `ACTION_SET_PLAYLIST_NAME`, `ACTION_SET_PLAYLIST_DESCRIPTION`, `ACTION_SET_PLAYLIST_PRIVACY` (`playlistPrivacy`) | `status: STATUS_SUCCEEDED` |
-| move in playlist | `browse/edit_playlist` | `ACTION_MOVE_VIDEO_AFTER` with `setVideoId`, `movedSetVideoIdPredecessor` | `status: STATUS_SUCCEEDED` |
+| move in playlist | `browse/edit_playlist` | `ACTION_MOVE_VIDEO_AFTER` with `setVideoId`, `movedSetVideoIdPredecessor`, or `ACTION_MOVE_VIDEO_BEFORE` with `setVideoId`, `movedSetVideoIdSuccessor` | `status: STATUS_SUCCEEDED` |
 | like, remove rating | `like/like`, `like/removelike` | `target: { videoId }` | a `likeStatusEntity` mutation with `LIKE` / `INDIFFERENT` |
 | subscribe, unsubscribe | `subscription/subscribe`, `/unsubscribe` | `channelIds`, `params` `EgIIAhgA` / `CgIIAhgA` | `actions[].updateSubscribeButtonAction` with the channel and new state |
 | notification bell | `notification/modify_channel_preference` | `params` from the channel's bell menu | a `subscriptionNotificationStateEntity.state` of `…_ALL`, `…_OCCASIONAL` (personalized) or `…_OFF` |
 
 Notes:
 
+- `ACTION_MOVE_VIDEO_BEFORE` with `movedSetVideoIdSuccessor` is not in
+  YouTube.js either; ytmusicapi uses it, and it is the only way to move an
+  entry to the top. A live check confirmed it on a playlist and on Watch Later.
 - `ACTION_SET_PLAYLIST_PRIVACY` with `playlistPrivacy` is not in YouTube.js;
   ytmusicapi sends it through the same `browse/edit_playlist` route, and a live
   check confirmed it on YouTube playlists by reading the privacy back.

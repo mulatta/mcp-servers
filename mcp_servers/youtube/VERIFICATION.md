@@ -23,7 +23,7 @@ the account ended as it started. Entries are newest first.
 | `youtube_add_to_playlist` | 2 and 50 videos; Watch Later; a duplicate | playlist edits, HTTP writes |
 | `youtube_remove_from_playlist` | 1 and 50 videos; Watch Later restored in order | playlist edits, HTTP writes |
 | `youtube_update_playlist` | title, description and privacy, each read back | update/move, details, privacy |
-| `youtube_move_in_playlist` | in a playlist and in Watch Later; not-found and duplicate refusals | update/move, HTTP writes |
+| `youtube_move_in_playlist` | after and before (to the top), in a playlist and in Watch Later; not-found and duplicate refusals | update/move, move-to-top, HTTP writes |
 | `youtube_like_video` | on a video that was not liked | ratings |
 | `youtube_remove_rating` | the same video; liked list restored | ratings |
 | `youtube_subscribe` | a channel that was not followed | subscriptions |
@@ -36,6 +36,14 @@ public through an update),
 dislike, 5xx answers or refusals of live writes, accounts without
 subscriptions, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
+
+## Approved live move-to-top check: 2026-11-11
+
+In a new playlist holding three public uploads, moving the third before the
+first put it on top (visible after about 0.2 s); the playlist was deleted. In
+Watch Later (2,177 entries) the sixth entry was moved before the first
+(on top after about 9.8 s) and then back after its original predecessor;
+after about 9.9 s the whole list matched its original order.
 
 ## Approved live privacy change check: 2026-11-11
 
