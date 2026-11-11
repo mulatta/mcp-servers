@@ -1,6 +1,13 @@
 import { getEvent, listCalendars, searchEvents } from "./calendar.ts";
 import { getContact, listAddressBooks, searchContacts } from "./contacts.ts";
 import type { Tool } from "./define.ts";
+import {
+  createDraft,
+  deleteDraft,
+  sendDraft,
+  sendEmail,
+  updateDraft,
+} from "./drafts.ts";
 import { listMailboxes } from "./mailboxes.ts";
 import {
   addEmailsToMailbox,
@@ -40,4 +47,9 @@ export const tools: Tool[] = [
   deleteMailbox,
   trashEmails,
   destroyEmails,
+  createDraft,
+  updateDraft,
+  deleteDraft,
+  sendDraft,
+  sendEmail,
 ];
