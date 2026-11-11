@@ -1,5 +1,7 @@
 import type { SessionProvider } from "./auth/session.ts";
 import { SafeError } from "./errors.ts";
+import { keyName } from "./observability/logger.ts";
+import { recordWrite } from "./observability/trace.ts";
 import { userPlaylistId, type WriteToolName } from "./tools.ts";
 import type { Attempt, Route, YoutubeClient } from "./youtube/client.ts";
 import { normalize } from "./youtube/normalize.ts";
@@ -456,6 +458,26 @@ function collectSets(value: unknown, sets: Map<string, string[]>, depth = 0) {
   for (const child of Object.values(node)) collectSets(child, sets, depth + 1);
 }
 
+/** Logs a sent write's status and answer shape: key names, never values. */
+function diagnose(
+  attempt: Attempt,
+  data: Record<string, unknown>,
+  confirmed: boolean,
+) {
+  const names = (value: unknown, skip = "") =>
+    typeof value === "object" && value !== null
+      ? Object.keys(value).filter((key) => key !== skip && keyName.test(key))
+      : [];
+  recordWrite({
+    http_status: attempt.status,
+    confirmed,
+    response_keys: names(data).slice(0, 16),
+    action_keys: (Array.isArray(data.actions) ? data.actions : [])
+      .flatMap((action) => names(action, "clickTrackingParams"))
+      .slice(0, 16),
+  });
+}
+
 export function createWriter(sessions: SessionProvider<YoutubeClient>): Writer {
   return (name, input, signal, attempt) =>
     sessions.once(signal, async (snapshot) => {
@@ -463,23 +485,26 @@ export function createWriter(sessions: SessionProvider<YoutubeClient>): Writer {
       const prepared = operation.prepare
         ? await operation.prepare(snapshot.value, input, signal)
         : {};
-      const response = await snapshot.value.use(
-        signal,
-        (client) =>
-          client.actions.execute(operation.path, {
-            ...operation.body(input, prepared),
-            parse: false,
-          }),
-        operation.routes,
-        attempt,
-      );
-      const data =
-        typeof response.data === "object" && response.data !== null
-          ? (response.data as Record<string, unknown>)
-          : {};
-      return {
-        account_id: snapshot.accountId,
-        ...operation.result(data, input),
-      };
+      let data: Record<string, unknown> = {};
+      try {
+        const response = await snapshot.value.use(
+          signal,
+          (client) =>
+            client.actions.execute(operation.path, {
+              ...operation.body(input, prepared),
+              parse: false,
+            }),
+          operation.routes,
+          attempt,
+        );
+        if (typeof response.data === "object" && response.data !== null)
+          data = response.data as Record<string, unknown>;
+        const result = operation.result(data, input);
+        diagnose(attempt, data, true);
+        return { account_id: snapshot.accountId, ...result };
+      } catch (error) {
+        if (attempt.dispatched) diagnose(attempt, data, false);
+        throw error;
+      }
     });
 }

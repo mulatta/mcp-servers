@@ -348,8 +348,8 @@ shapes fail closed.
 `YOUTUBE_LOG_LEVEL` selects `error`, `warn`, `info` (default) or `debug`.
 Records are JSONL on stderr with `schema_version: 1`, UTC `timestamp`, `level`
 and a fixed `event`. Fields are limited to generated correlation IDs, fixed
-stage, tool and result names, limits, counts, durations, cache states and safe
-error codes. Cookies, tokens, CDP URLs, account, video, playlist and channel
+stage, tool and result names, limits, counts, durations, cache states, safe
+error codes, HTTP statuses and YouTube response key names. Cookies, tokens, CDP URLs, account, video, playlist and channel
 IDs, titles, cursors and raw requests or responses are never logged, nor are
 their hashes. Requested results stay on stdout (stdio) or in the HTTP body.
 
@@ -363,6 +363,7 @@ their hashes. Requested results stay on stdout (stdio) or in the HTTP body.
 | `request.end` | info, warn | tool, `limit` for reads, outcome, safe code, duration, cache states |
 | `logs.dropped` | warn | count of records lost to backpressure |
 | `stage.start`/`stage.end` | debug | stage boundaries, see below |
+| `upstream.write` | debug | a sent write's HTTP status, whether its answer confirmed it, and the key names of the answer and its actions |
 
 The writer keeps at most 256 records or 256 KiB pending; on saturation new
 records are dropped and later counted in `logs.dropped`. A broken sink
@@ -384,6 +385,11 @@ debug, stages mark these inclusive boundaries:
 | `upstream.request` | Browse execution through body consumption and parsing |
 | `normalize` | Local page normalization |
 | `pagination` | Page assembly, cursor management, and nested waits |
+
+`upstream.write` explains a `WRITE_OUTCOME_UNKNOWN` after the fact: the
+status shows a refused or failed request, and the key names show what an
+unconfirmed answer held instead. Only names that are plain camelCase words
+are kept, so an ID used as a key is left out.
 
 Nested stage durations are inclusive; do not add them. A shared
 authentication has its own `refresh_id`, linked from each waiting request.

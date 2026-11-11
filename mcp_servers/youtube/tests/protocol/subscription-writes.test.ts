@@ -5,6 +5,7 @@ import { createServer } from "../../src/server.ts";
 import { createBackend } from "../../src/reader.ts";
 import type { WriteGroup } from "../../src/config.ts";
 import { libraryServer } from "../fixtures/library-server.ts";
+import { captureDiagnostics } from "../fixtures/diagnostic-capture.ts";
 
 const channel = "UCfixture000000000000009";
 const cleanups: (() => Promise<unknown> | unknown)[] = [];
@@ -32,9 +33,11 @@ async function connect(
     },
   });
   const backend = createBackend({ cdpUrl: f.browser.url, network: f.network });
+  const diagnostics = captureDiagnostics();
   const server = createServer(backend.reader, {
     writer: backend.writer,
     writes: new Set(options.writes ?? ["subscription"]),
+    logger: diagnostics.logger,
   });
   const client = new Client({ name: "subscription-writes-test", version: "1" });
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -55,7 +58,7 @@ async function connect(
         : "ok",
     };
   };
-  return { client, call, writes, f };
+  return { client, call, writes, f, diagnostics };
 }
 
 test("subscription tools are absent and unreachable unless their group is enabled", async () => {
@@ -159,4 +162,67 @@ test("unsubscribing is declared destructive, subscribing is not", async () => {
     readOnlyHint: false,
     destructiveHint: true,
   });
+});
+
+// Live, a repeated subscribe once came back unconfirmed and nothing showed
+// why; each write now leaves its status and response key names at debug.
+const writeRecords = async (diagnostics: {
+  finish(): Promise<Record<string, unknown>[]>;
+}) => {
+  const records = await diagnostics.finish();
+  expect(JSON.stringify(records)).not.toContain(channel);
+  return records.filter((record) => record.event === "upstream.write");
+};
+
+test("a confirmed write logs its status and response key names", async () => {
+  const { call, diagnostics } = await connect();
+  expect((await call("youtube_subscribe", { channel_id: channel })).code).toBe(
+    "ok",
+  );
+  expect(await writeRecords(diagnostics)).toMatchObject([
+    {
+      level: "debug",
+      http_status: 200,
+      confirmed: true,
+      response_keys: ["actions"],
+      action_keys: ["updateSubscribeButtonAction"],
+    },
+  ]);
+});
+
+test("an unconfirmed write logs what came back instead, never IDs", async () => {
+  const { call, diagnostics } = await connect({
+    onWrite: () =>
+      Response.json({
+        actions: [
+          { clickTrackingParams: "x", addToGuideSectionAction: {} },
+          { [channel]: {} },
+        ],
+        trackingParams: "x",
+      }),
+  });
+  expect((await call("youtube_subscribe", { channel_id: channel })).code).toBe(
+    "WRITE_OUTCOME_UNKNOWN",
+  );
+  expect(await writeRecords(diagnostics)).toMatchObject([
+    {
+      http_status: 200,
+      confirmed: false,
+      response_keys: ["actions", "trackingParams"],
+      // Key names that are not plain words, such as an ID, are left out.
+      action_keys: ["addToGuideSectionAction"],
+    },
+  ]);
+});
+
+test("a failed write logs the upstream status", async () => {
+  const { call, diagnostics } = await connect({
+    onWrite: () => new Response("busy", { status: 503 }),
+  });
+  expect((await call("youtube_subscribe", { channel_id: channel })).code).toBe(
+    "WRITE_OUTCOME_UNKNOWN",
+  );
+  expect(await writeRecords(diagnostics)).toMatchObject([
+    { http_status: 503, confirmed: false, response_keys: [], action_keys: [] },
+  ]);
 });

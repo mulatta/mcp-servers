@@ -31,6 +31,10 @@ export type Stage = z.infer<typeof stage>;
 const authCache = z.enum(["hit", "miss", "shared", "mixed"]);
 const pageCache = z.enum(["miss", "buffer", "replay", "shared", "mixed"]);
 const outcome = z.enum(["ok", "error", "timeout", "cancelled"]);
+// Response key names are YouTube schema words; anything else, such as an ID
+// used as a key, does not fit and is never logged.
+export const keyName = /^[a-z][A-Za-z]{0,63}$/;
+const keyNames = z.array(z.string().regex(keyName)).max(16);
 function events<T extends z.ZodType>(id: T) {
   const reference = z.object({
     stage,
@@ -88,6 +92,14 @@ function events<T extends z.ZodType>(id: T) {
       ]),
     }),
     z.object({ event: z.literal("logs.dropped"), count: count.positive() }),
+    z.object({
+      event: z.literal("upstream.write"),
+      request_id: id.optional(),
+      http_status: z.number().int().min(100).max(599).optional(),
+      confirmed: z.boolean(),
+      response_keys: keyNames,
+      action_keys: keyNames,
+    }),
     z.object({ event: z.literal("stage.start"), ...scope }),
     z.object({
       event: z.literal("stage.end"),
@@ -143,7 +155,9 @@ function severity(data: {
         data.event === "http.rejected" ||
         (data.event === "request.end" && data.outcome !== "ok")
       ? "warn"
-      : data.event === "stage.start" || data.event === "stage.end"
+      : data.event === "stage.start" ||
+          data.event === "stage.end" ||
+          data.event === "upstream.write"
         ? "debug"
         : "info";
 }

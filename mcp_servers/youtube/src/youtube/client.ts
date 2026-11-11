@@ -30,8 +30,13 @@ const routes = {
 } as const;
 export type Route = keyof typeof routes;
 
-// Tracks whether a write left the process and whether YouTube refused it outright.
-export type Attempt = { dispatched: boolean; rejected: boolean };
+// Tracks whether a write left the process, whether YouTube refused it
+// outright, and the HTTP status it answered with, for diagnostics.
+export type Attempt = {
+  dispatched: boolean;
+  rejected: boolean;
+  status?: number;
+};
 
 const active = new AsyncLocalStorage<{
   signal: AbortSignal;
@@ -136,6 +141,7 @@ export class YoutubeClient {
               } catch {
                 throw new SafeError("UPSTREAM_UNAVAILABLE");
               }
+              if (writing) attempt.status = response.status;
               try {
                 await checkResponse(response);
               } catch (error) {

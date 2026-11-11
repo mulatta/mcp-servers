@@ -100,6 +100,22 @@ export async function stage<T>(
   });
 }
 
+/** Records what a write's answer looked like, in the current request. */
+export function recordWrite(
+  fields: Omit<
+    Extract<LogEvent, { event: "upstream.write" }>,
+    "event" | "request_id"
+  >,
+) {
+  const store = context.getStore();
+  if (!store || store.scope.closed) return;
+  store.scope.logger.emit({
+    event: "upstream.write",
+    request_id: store.scope.request_id,
+    ...fields,
+  });
+}
+
 function snapshot(scope: Scope): StageReference[] {
   return [...scope.active.values()].map((span) => ({
     stage: span.stage,
