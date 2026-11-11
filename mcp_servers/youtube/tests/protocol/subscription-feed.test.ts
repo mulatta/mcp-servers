@@ -101,3 +101,57 @@ test("tracking params alone do not make an unknown action acceptable", () => {
     normalize(response, "subscription_feed", { continuation: true }),
   ).toThrow();
 });
+
+// Observed live on an account that follows no channel (2026-11-11): the feed
+// suggests channels to follow instead of listing videos.
+const suggestions = {
+  contents: {
+    twoColumnBrowseResultsRenderer: {
+      tabs: [
+        {
+          tabRenderer: {
+            selected: true,
+            content: {
+              sectionListRenderer: {
+                contents: [
+                  {
+                    itemSectionRenderer: {
+                      contents: [
+                        {
+                          shelfRenderer: {
+                            content: {
+                              gridRenderer: {
+                                items: [
+                                  {
+                                    gridChannelRenderer: {
+                                      channelId: "UCfixture000000000000001",
+                                    },
+                                  },
+                                ],
+                              },
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    },
+  },
+};
+
+test("channel suggestions on an empty feed are not feed items", () => {
+  expect(normalize(suggestions, "subscription_feed")).toEqual({
+    items: [],
+    continuation: null,
+  });
+});
+
+test("channel suggestions elsewhere stay a layout change", () => {
+  expect(() => normalize(suggestions, "videos")).toThrow();
+});

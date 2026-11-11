@@ -369,7 +369,7 @@ All 20 tools were checked live on one account on 2026-11-10 and 2026-11-11.
 
 | Area | Checked live | Not checked live |
 | --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| reads | five items per tool; full paging of Watch Later, playlists, subscriptions; new fields populated; unknown and upload-less channels | accounts with no subscriptions |
+| reads | five items per tool; full paging of Watch Later, playlists, subscriptions; new fields populated; unknown and upload-less channels; every list on an empty account | — |
 | playlists | create (private; unlisted with description, both read back), delete, add/remove 1–50 videos, rename, privacy changes read back, move (including to the top) in a playlist and in Watch Later, not-found and duplicate refusals | creating a playlist as public in one call, `PLAYLIST_TOO_LONG` |
 | ratings | like and removal on a video that was not liked | removing a dislike |
 | subscriptions | subscribe and unsubscribe a channel that was not followed | — |

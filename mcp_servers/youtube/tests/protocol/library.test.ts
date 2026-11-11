@@ -173,3 +173,39 @@ test("an empty playlist reads as an empty list", () => {
   );
   expect(page).toEqual({ items: [], continuation: null });
 });
+
+const selectedTab = (contents: unknown[]) => ({
+  contents: {
+    twoColumnBrowseResultsRenderer: {
+      tabs: [
+        {
+          tabRenderer: {
+            selected: true,
+            content: { sectionListRenderer: { contents } },
+          },
+        },
+      ],
+    },
+  },
+});
+
+// Observed live on an account that had never watched anything (2026-11-11).
+test("an empty watch history reads as an empty list", () => {
+  const page = normalize(
+    selectedTab([
+      {
+        itemSectionRenderer: {
+          contents: [
+            {
+              messageRenderer: {
+                text: { runs: [{ text: "This list has no videos." }] },
+              },
+            },
+          ],
+        },
+      },
+    ]),
+    "history",
+  );
+  expect(page).toEqual({ items: [], continuation: null });
+});

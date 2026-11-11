@@ -360,6 +360,21 @@ export function normalize(
         .filter((t) => t.selected === true);
       if (selected.length !== 1) throw new SafeError("UPSTREAM_CHANGED");
       if (kind === "channel_videos") {
+        // The account's own channel without uploads shows the owner one tab
+        // without an endpoint, holding an upload prompt.
+        if (selected[0]!.endpoint === undefined) {
+          const sections = list(
+            object(object(selected[0]!.content).sectionListRenderer).contents,
+          );
+          if (
+            !sections.some(
+              (section) => object(section).channelOwnerEmptyStateRenderer,
+            )
+          )
+            throw new SafeError("UPSTREAM_CHANGED");
+          recognized = true;
+          return;
+        }
         // A channel without uploads has no Videos tab; YouTube then selects
         // another tab, recognisable by different params on its endpoint.
         const params = object(
@@ -392,6 +407,16 @@ export function normalize(
         text(
           object(object(container.header).itemSectionHeaderRenderer).title,
         ) ?? group;
+      // An account that follows no channel gets a first page whose section
+      // list has no contents at all; other lists say empty with a message.
+      if (
+        kind === "channels" &&
+        key === "sectionListRenderer" &&
+        !options.continuation &&
+        container.contents === undefined &&
+        container.items === undefined
+      )
+        return;
       let children = list(container.contents ?? container.items);
       // Playlist section-level continuations are recommendations, not list contents.
       if (key === "sectionListRenderer" && kind === "videos") {
@@ -423,6 +448,11 @@ export function normalize(
       recognized = true;
       return;
     }
+    // An account that follows no channel gets channel suggestions instead.
+    if (n.gridChannelRenderer && kind === "subscription_feed") {
+      recognized = true;
+      return;
+    }
     if (n.shelfRenderer) return walk(object(n.shelfRenderer).content, group);
     if (n.continuationItemRenderer || n.continuationItemViewModel) {
       recognized = true;
@@ -444,6 +474,7 @@ export function normalize(
           "This playlist has no videos.",
           "No videos in this playlist yet",
           "Your history is empty.",
+          "This list has no videos.",
           "No playlists",
         ].includes(message)
       )

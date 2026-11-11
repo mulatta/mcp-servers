@@ -242,3 +242,46 @@ test("an unknown channel ID reports CHANNEL_UNAVAILABLE", async () => {
     server.stop(true);
   }
 });
+
+// Observed live on the signed-in account's own channel with no uploads
+// (2026-11-11): its only tab has no endpoint and offers an upload button.
+const ownEmptyChannel = (contents: unknown[]) => ({
+  contents: {
+    twoColumnBrowseResultsRenderer: {
+      tabs: [
+        {
+          tabRenderer: {
+            title: "Home",
+            selected: true,
+            content: { sectionListRenderer: { contents } },
+          },
+        },
+      ],
+    },
+  },
+});
+
+test("the account's own channel without uploads has no uploads", () => {
+  expect(
+    normalize(
+      ownEmptyChannel([
+        {
+          channelOwnerEmptyStateRenderer: {
+            uploadVideoButton: { buttonRenderer: {} },
+          },
+        },
+        { itemSectionRenderer: { contents: [] } },
+      ]),
+      "channel_videos",
+    ),
+  ).toEqual({ items: [], continuation: null });
+});
+
+test("an endpoint-less tab without the owner's empty state stays unknown", () => {
+  expect(() =>
+    normalize(
+      ownEmptyChannel([{ itemSectionRenderer: { contents: [] } }]),
+      "channel_videos",
+    ),
+  ).toThrow();
+});

@@ -34,9 +34,24 @@ the account ended as it started. Entries are newest first.
 Not checked live: creating a playlist as public in one call (it was made
 public through an update),
 `PLAYLIST_TOO_LONG`, removing a
-dislike, 5xx answers or refusals of live writes, accounts without
-subscriptions, a reverse proxy
+dislike, 5xx answers or refusals of live writes, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
+
+## Empty test account: 2026-11-11
+
+A new test account with a channel and nothing else was read with every list
+tool before anything was added to it. Subscriptions, the subscription feed and
+watch history failed with `UPSTREAM_CHANGED`; key-only probes showed three
+empty layouts the normalizer did not know. Subscriptions return the selected
+tab's section list with a chip bar header and no contents. The feed returns
+shelves of suggested channels instead of videos. History returns a message,
+"This list has no videos.", that was not among the recognized empty-list
+messages. Each now reads as an empty list, with a synthetic regression test;
+the probe then read all six lists on the same account without an error. Watch
+Later, liked videos and playlists were already read as empty. Later the
+account's own channel, before its first upload, failed the same way in
+`youtube_get_channel_videos`: the owner sees one tab without an endpoint
+holding an upload prompt. It now reads as no uploads.
 
 ## Approved live subscription feed check: 2026-11-11
 

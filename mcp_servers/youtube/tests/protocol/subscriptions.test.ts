@@ -114,3 +114,47 @@ test("unknown entries in the subscriptions list fail closed", () => {
     ),
   ).toThrow(SafeError);
 });
+
+// An account that follows no channel gets the selected tab's section list
+// with its chip bar header and no contents at all (seen live 2026-11-11).
+const noSubscriptions = (sectionList: Record<string, unknown>) => ({
+  contents: {
+    twoColumnBrowseResultsRenderer: {
+      tabs: [
+        {
+          tabRenderer: {
+            selected: true,
+            content: { sectionListRenderer: sectionList },
+          },
+        },
+      ],
+    },
+  },
+});
+
+test("an account without subscriptions reads as an empty list", () => {
+  const page = normalize(
+    noSubscriptions({
+      header: { chipBarViewModel: { chips: [] } },
+      targetId: "browse-feedFEchannels",
+    }),
+    "channels",
+  );
+  expect(page).toEqual({ items: [], continuation: null });
+});
+
+test("a section list without contents stays a layout change elsewhere", () => {
+  for (const kind of ["videos", "playlists", "history"] as const)
+    expect(() =>
+      normalize(
+        noSubscriptions({ header: { chipBarViewModel: { chips: [] } } }),
+        kind,
+      ),
+    ).toThrow(SafeError);
+});
+
+test("a subscriptions continuation without contents stays a layout change", () => {
+  expect(() =>
+    normalize(noSubscriptions({}), "channels", { continuation: true }),
+  ).toThrow(SafeError);
+});
