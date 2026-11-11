@@ -501,7 +501,7 @@ local macOS checks, not Linux CI or renewed live-account verification.
 
 ## External measurement record template
 
-Follow the [external procedure](README.md#external-latency-verification).
+Follow the [external procedure](DEVELOPMENT.md#external-latency-verification).
 This table is a template, not a new account measurement or a benchmark command.
 Record tool name, limit, log level, runtime, collector conditions, approved scope,
 attempt/preparation counts, and total budget before filling it in. Defaults are
