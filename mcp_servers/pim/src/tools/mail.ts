@@ -125,7 +125,8 @@ function filterOf(input: SearchInput) {
     });
   if (input.has_attachment !== undefined)
     conditions.push({ hasAttachment: input.has_attachment });
-  return conditions.length ? { operator: "AND", conditions } : null;
+  // Stalwart rejects `filter: null`; no conditions means no filter at all.
+  return conditions.length ? { filter: { operator: "AND", conditions } } : {};
 }
 
 export const searchEmails = tool({
@@ -141,7 +142,7 @@ export const searchEmails = tool({
         [
           "Email/query",
           {
-            filter: filterOf(input),
+            ...filterOf(input),
             sort: [{ property: "receivedAt", isAscending: false }],
             position,
             limit: input.limit,

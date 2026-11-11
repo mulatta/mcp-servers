@@ -13,7 +13,8 @@ const setArgs = (method: string): Record<string, any> =>
     .flatMap((request) => request.calls)
     .find(([name]) => name === method)![1];
 
-const plain = { id: "ev1", baseEventId: null, participants: null };
+// Stalwart names an event its own base when it is read directly.
+const plain = { id: "ev1", baseEventId: "ev1" };
 const invited = {
   id: "ev2",
   baseEventId: null,
@@ -163,7 +164,8 @@ describe("contact", () => {
     });
     const result = await env.call("pim_create_contact", {
       address_book_id: "b1",
-      name: "Ada Example",
+      given_name: "Ada",
+      surname: "Example",
       emails: ["ada@example.test"],
       phones: ["+82 10 0000 0000"],
       organization: "Example Org",
@@ -179,12 +181,37 @@ describe("contact", () => {
       uid: result.structured!.uid,
       kind: "individual",
       addressBookIds: { b1: true },
-      name: { full: "Ada Example" },
+      name: {
+        full: "Ada Example",
+        components: [
+          { "@type": "NameComponent", kind: "given", value: "Ada" },
+          { "@type": "NameComponent", kind: "surname", value: "Example" },
+        ],
+      },
       emails: { e1: { "@type": "EmailAddress", address: "ada@example.test" } },
       phones: { p1: { "@type": "Phone", number: "+82 10 0000 0000" } },
       organizations: { o1: { "@type": "Organization", name: "Example Org" } },
       notes: { n1: { "@type": "Note", note: "Met at a conference" } },
     });
+  });
+
+  test("a display name alone is stored without components", async () => {
+    env = await connected({ writes: ["contact"] });
+    env.stalwart.jmap = answer({
+      "ContactCard/set": { created: { new: { id: "k9" } } },
+    });
+    await env.call("pim_create_contact", {
+      address_book_id: "b1",
+      name: "Example Org Desk",
+    });
+    expect(setArgs("ContactCard/set").create.new.name).toEqual({
+      full: "Example Org Desk",
+    });
+    const nameless = await env.client.callTool({
+      name: "pim_create_contact",
+      arguments: { address_book_id: "b1" },
+    });
+    expect(nameless.isError).toBe(true);
   });
 
   test("updates replace the given fields and deletes are confirmed", async () => {

@@ -116,7 +116,7 @@ function summarizeCard(value: unknown) {
 export const searchContacts = tool({
   name: "pim_search_contacts",
   description:
-    "Search contacts. text matches names, emails, phones, organizations, addresses and notes; email and name narrow further. Returns names, emails, phones and organizations; read a whole card with pim_get_contact.",
+    "Search contacts. text matches whole words in names, nicknames, organizations, emails, phones, addresses and notes; email and name narrow further. Returns names, emails, phones and organizations; read a whole card with pim_get_contact.",
   input: {
     address_book_id: id.optional(),
     text: z.string().min(1).max(500).optional(),
@@ -138,7 +138,10 @@ export const searchContacts = tool({
         [
           "ContactCard/query",
           {
-            filter: conditions.length ? { operator: "AND", conditions } : null,
+            // Stalwart rejects `filter: null`; no conditions means no filter at all.
+            ...(conditions.length
+              ? { filter: { operator: "AND", conditions } }
+              : {}),
             position,
             limit: input.limit,
             calculateTotal: true,

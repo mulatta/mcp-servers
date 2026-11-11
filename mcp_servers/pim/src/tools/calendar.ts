@@ -103,7 +103,11 @@ function summarizeEvent(value: unknown) {
   const event = expect(eventSummary, value);
   return {
     event_id: event.id,
-    base_event_id: event.baseEventId ?? null,
+    // Stalwart names an event its own base when it is read directly.
+    base_event_id:
+      event.baseEventId && event.baseEventId !== event.id
+        ? event.baseEventId
+        : null,
     calendar_ids: trueKeys(event.calendarIds),
     title: event.title ?? null,
     start: event.start ?? null,
@@ -120,12 +124,13 @@ function summarizeEvent(value: unknown) {
   };
 }
 
-const yearMs = 366 * 24 * 60 * 60 * 1000;
+// Stalwart's maxExpandedQueryDuration is P52W1D.
+const yearMs = 365 * 24 * 60 * 60 * 1000;
 
 export const searchEvents = tool({
   name: "pim_search_events",
   description:
-    "List calendar events overlapping a time range (after and before, ISO 8601, at most 366 days apart), earliest first. Recurring events appear once per occurrence, each with its own event_id and the series in base_event_id. Optional calendar_id and text (title, description, location, people). Read details with pim_get_event.",
+    "List calendar events overlapping a time range (after and before, ISO 8601, at most 365 days apart), earliest first. Recurring events appear once per occurrence, each with its own event_id and the series in base_event_id. Optional calendar_id and text (title, description, location, people). Read details with pim_get_event.",
   input: {
     after: utcDate,
     before: utcDate,

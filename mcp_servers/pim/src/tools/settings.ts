@@ -124,6 +124,20 @@ const uploadScript = (content: string): [string, Record<string, unknown>] => [
   },
 ];
 
+const uploadResult = z.object({
+  created: z
+    .record(z.string(), z.object({ id: z.string() }))
+    .nullable()
+    .optional(),
+});
+
+/** The blob ID of upload `#script`, or the server's refusal. */
+function uploaded(answer: unknown) {
+  const blob = expect(uploadResult, answer).created?.script;
+  if (!blob) throw new SafeError("INVALID_REQUEST");
+  return blob.id;
+}
+
 const validation = z.object({
   error: z
     .object({ type: z.string(), description: z.string().nullable().optional() })
@@ -138,13 +152,17 @@ export const validateSieveScript = tool({
   input: { content: scriptContent },
   idempotent: true,
   async run(input, { jmap, signal }) {
-    // Uploading a blob changes no visible state, so this is not a tracked write.
-    const [, result] = await jmap.call(
-      ["sieve", "blob"],
-      [
-        uploadScript(input.content),
-        ["SieveScript/validate", { blobId: "#script" }],
-      ],
+    // Uploading a blob changes no visible state, so this is not a tracked
+    // write. Stalwart 0.15 resolves blob creation IDs in SieveScript/set but
+    // not in SieveScript/validate, so the upload is its own request.
+    const [upload] = await jmap.call(
+      ["blob"],
+      [uploadScript(input.content)],
+      signal,
+    );
+    const [result] = await jmap.call(
+      ["sieve"],
+      [["SieveScript/validate", { blobId: uploaded(upload) }]],
       signal,
     );
     const { error } = expect(validation, result);

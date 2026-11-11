@@ -14,7 +14,7 @@ const upload = {
 };
 
 describe("sieve", () => {
-  test("validation uploads the text and reports the server's verdict", async () => {
+  test("validation uploads the text, then asks the server's parser", async () => {
     env = await connected({ writes: ["sieve"] });
     env.stalwart.jmap = answer({
       "Blob/upload": upload,
@@ -27,20 +27,20 @@ describe("sieve", () => {
       valid: true,
       error: null,
     });
-    const [[uploadName, uploadArgs], [validate, validateArgs]] = request(0)
-      .calls as [MethodCall, MethodCall];
+    // Stalwart 0.15 resolves blob creation IDs in SieveScript/set but not
+    // in SieveScript/validate, so the upload is its own request.
+    const [[uploadName, uploadArgs]] = request(0).calls as [MethodCall];
     expect(uploadName).toBe("Blob/upload");
     expect(uploadArgs.create).toEqual({
       script: { data: [{ "data:asText": script }], type: "application/sieve" },
     });
-    expect(validate).toBe("SieveScript/validate");
-    expect(validateArgs.blobId).toBe("#script");
     expect(request(0).using).toEqual(
-      expect.arrayContaining([
-        "urn:ietf:params:jmap:sieve",
-        "urn:ietf:params:jmap:blob",
-      ]),
+      expect.arrayContaining(["urn:ietf:params:jmap:blob"]),
     );
+    const [[validate, validateArgs]] = request(1).calls as [MethodCall];
+    expect(validate).toBe("SieveScript/validate");
+    expect(validateArgs.blobId).toBe("blob1");
+    expect(request(1).using).toContain("urn:ietf:params:jmap:sieve");
 
     env.stalwart.jmap = answer({
       "Blob/upload": upload,

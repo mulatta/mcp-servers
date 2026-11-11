@@ -121,6 +121,15 @@ describe("pim_search_emails", () => {
     expect(garbage.error?.code).toBe("CURSOR_INVALID");
   });
 
+  test("a search without conditions sends no filter", async () => {
+    env.stalwart.jmap = answer({
+      "Email/query": { ids: [], position: 0, total: 0, queryState: "q" },
+      "Email/get": { list: [], notFound: [] },
+    });
+    await env.call("pim_search_emails", {});
+    expect("filter" in env.stalwart.jmapRequests[0]!.calls[0]![1]).toBe(false);
+  });
+
   test("an email that vanished between query and get is skipped", async () => {
     env.stalwart.jmap = answer({
       "Email/query": {

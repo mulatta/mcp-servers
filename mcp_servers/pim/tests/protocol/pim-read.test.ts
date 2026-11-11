@@ -106,7 +106,7 @@ describe("calendars", () => {
 
   test("pim_search_events refuses ranges over a year or backwards", async () => {
     for (const range of [
-      { after: "2026-01-01T00:00:00Z", before: "2027-06-01T00:00:00Z" },
+      { after: "2026-01-01T00:00:00Z", before: "2027-01-01T00:00:01Z" },
       { after: "2026-02-01T00:00:00Z", before: "2026-01-01T00:00:00Z" },
     ]) {
       const result = await env.client.callTool({
@@ -116,6 +116,19 @@ describe("calendars", () => {
       expect(result.isError).toBe(true);
     }
     expect(env.stalwart.jmapRequests).toHaveLength(0);
+  });
+
+  test("an event read directly is its own base, not an occurrence", async () => {
+    env.stalwart.jmap = answer({
+      "CalendarEvent/get": {
+        notFound: [],
+        list: [{ ...event, baseEventId: "ev1" }],
+      },
+    });
+    expect(
+      (await env.call("pim_get_event", { event_id: "ev1" })).structured!
+        .base_event_id,
+    ).toBeNull();
   });
 
   test("pim_get_event returns participants and description", async () => {
@@ -234,6 +247,16 @@ describe("contacts", () => {
       conditions: [{ inAddressBook: "b1" }, { text: "ada" }],
     });
     expect(sent().using).toContain("urn:ietf:params:jmap:contacts");
+  });
+
+  test("a search without conditions sends no filter", async () => {
+    // Stalwart rejects `filter: null` with invalidArguments.
+    env.stalwart.jmap = answer({
+      "ContactCard/query": { ids: [], position: 0, total: 0 },
+      "ContactCard/get": { list: [], notFound: [] },
+    });
+    await env.call("pim_search_contacts", {});
+    expect("filter" in sent().calls[0]![1]).toBe(false);
   });
 
   test("names fall back to their components", async () => {

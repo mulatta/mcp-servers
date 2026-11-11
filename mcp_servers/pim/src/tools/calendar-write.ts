@@ -111,7 +111,10 @@ async function requireUnscheduled(
   const event = expect(scheduled, found);
   if (Object.keys(event.participants ?? {}).length)
     throw new SafeError("PARTICIPANTS_REFUSED");
-  if (event.baseEventId) throw new SafeError("INVALID_REQUEST");
+  // Stalwart names an event its own base when it is read directly; only an
+  // occurrence of a recurring event has another.
+  if (event.baseEventId && event.baseEventId !== event.id)
+    throw new SafeError("INVALID_REQUEST");
 }
 
 export const updateEvent = tool({
