@@ -1,12 +1,13 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { toolNames, type ToolName } from "../../src/server.ts";
+import { toolNames } from "../../src/server.ts";
+import type { ReadToolName } from "../../src/tools.ts";
 import { resultSchema } from "../../src/youtube/normalize.ts";
 import { SafeError, isErrorCode, safeError } from "../../src/errors.ts";
 import { z } from "zod";
 
 const failureSchema = z.object({ code: z.string().refine(isErrorCode) });
 export type CheckReport = {
-  tool: ToolName;
+  tool: ReadToolName;
   requested: number;
   status: "ok" | "error";
   items?: number;
@@ -16,6 +17,32 @@ export type CheckReport = {
   code?: string;
   elapsed_ms: number;
 };
+
+// Reconstructs the safe error a tool returned, so reports carry only its code.
+function failure(content: unknown): SafeError {
+  if (Array.isArray(content))
+    for (const item of content) {
+      if (item?.type !== "text" || typeof item.text !== "string") continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(item.text);
+      } catch {
+        continue;
+      }
+      const result = failureSchema.safeParse(parsed);
+      if (result.success && isErrorCode(result.data.code))
+        return new SafeError(result.data.code);
+    }
+  return new SafeError("UPSTREAM_UNAVAILABLE");
+}
+
+const detailsSchema = z.strictObject({
+  account_id: z.string(),
+  playlist_id: z.string(),
+  title: z.string().nullable(),
+  description: z.string().nullable(),
+  privacy: z.enum(["private", "unlisted", "public"]).nullable(),
+});
 
 export async function checkTools(client: Client): Promise<CheckReport[]> {
   let accountId: string | undefined;
@@ -39,22 +66,7 @@ export async function checkTools(client: Client): Promise<CheckReport[]> {
               : {}),
         },
       });
-      if (response.isError) {
-        if (Array.isArray(response.content))
-          for (const item of response.content) {
-            if (item.type !== "text" || typeof item.text !== "string") continue;
-            let parsed: unknown;
-            try {
-              parsed = JSON.parse(item.text);
-            } catch {
-              continue;
-            }
-            const failure = failureSchema.safeParse(parsed);
-            if (failure.success && isErrorCode(failure.data.code))
-              throw new SafeError(failure.data.code);
-          }
-        throw new SafeError("UPSTREAM_UNAVAILABLE");
-      }
+      if (response.isError) throw failure(response.content);
       const result = resultSchema.parse(response.structuredContent);
       if (accountId && result.account_id !== accountId)
         throw new SafeError("ACCOUNT_CHANGED");
@@ -102,6 +114,35 @@ export async function checkTools(client: Client): Promise<CheckReport[]> {
         elapsed_ms: Math.round(performance.now() - started),
       });
     }
+  }
+  // The details read targets the playlist found above and reports only nulls.
+  const started = performance.now();
+  const base = { tool: "youtube_get_playlist_details" as const, requested: 1 };
+  try {
+    const response = await client.callTool({
+      name: "youtube_get_playlist_details",
+      arguments: { playlist_id: playlistId },
+    });
+    if (response.isError) throw failure(response.content);
+    const result = detailsSchema.parse(response.structuredContent);
+    if (accountId && result.account_id !== accountId)
+      throw new SafeError("ACCOUNT_CHANGED");
+    reports.push({
+      ...base,
+      status: "ok",
+      account_consistent: true,
+      null_fields: (["title", "description", "privacy"] as const).filter(
+        (field) => result[field] === null,
+      ),
+      elapsed_ms: Math.round(performance.now() - started),
+    });
+  } catch (error) {
+    reports.push({
+      ...base,
+      status: "error",
+      code: safeError(error).code,
+      elapsed_ms: Math.round(performance.now() - started),
+    });
   }
   return reports;
 }

@@ -109,7 +109,11 @@ export function libraryServer(
                 { appendContinuationItemsAction: { continuationItems: items } },
               ],
             }
-          : { contents: { playlistVideoListRenderer: { contents: items } } },
+          : {
+              contents: { playlistVideoListRenderer: { contents: items } },
+              // Lets the details tool read the same fixture playlist.
+              metadata: { playlistMetadataRenderer: { title: "Fixture" } },
+            },
       );
     },
   });

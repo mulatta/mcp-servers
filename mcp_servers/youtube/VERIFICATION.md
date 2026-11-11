@@ -36,6 +36,17 @@ dislike, 5xx answers or refusals of live writes, accounts without
 subscriptions, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
 
+## Approved live smoke check with playlist details: 2026-11-11
+
+`bun run test:live` read five items from each list tool and then the details of
+the first listed playlist (liked videos): all eight calls succeeded with one
+account ID, and the details had `description` and `privacy` null. A key-only
+probe of the first six listed playlists explained the nulls: liked videos,
+Watch Later and other system lists still use `playlistHeaderRenderer` without
+a privacy label, and saved playlists owned by other channels show only
+`Playlist`, video and view counts. The privacy label appears only on the
+account's own playlists.
+
 ## Approved live repeated-rating check: 2026-11-11
 
 Before tool descriptions stated that repeating a rating is harmless, a public

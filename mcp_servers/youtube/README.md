@@ -154,7 +154,9 @@ responses carry identical JSON in `structuredContent` and the text block:
 - `published_text`: YouTube's relative upload label, such as `2 days ago`.
   `youtube_get_playlist_details` returns `{ account_id, playlist_id, title, description, privacy }` without items or cursor. `description` is `null` when
   the playlist has none; `privacy` is `private`, `unlisted` or `public` from the
-  page header's exact label, or `null` when there is not exactly one.
+  page header's exact label, or `null` when there is not exactly one. Only the
+  account's own playlists carry that label; system lists such as `WL` and `LL`
+  and playlists saved from other channels read as `null`.
 
 - `handle` is the `@name`; `subscriber_count_text` is shown as YouTube displays
   it; `notification` is `all`, `personalized` or `none`, read from the icon of
@@ -340,8 +342,9 @@ checks also build the package with tests, the flakelet units, and a NixOS VM
 test of the HTTP service.
 
 Live checks need the account owner's explicit approval each time. The
-read-only smoke check reads five items per read tool over stdio and prints
-only counts, codes and timings:
+read-only smoke check reads five items per list tool over stdio, then the
+details of a playlist found on the way, and prints only counts, null fields,
+codes and timings:
 
 ```sh
 YOUTUBE_LIVE_READONLY=1 YOUTUBE_CDP_URL=http://127.0.0.1:9222 bun run test:live
