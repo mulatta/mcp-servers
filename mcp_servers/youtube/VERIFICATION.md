@@ -22,7 +22,7 @@ the account ended as it started. Entries are newest first.
 | `youtube_delete_playlist` | removed from the list within 0.5 s | create/delete |
 | `youtube_add_to_playlist` | 2 and 50 videos; Watch Later; a duplicate | playlist edits, HTTP writes |
 | `youtube_remove_from_playlist` | 1 and 50 videos; Watch Later restored in order | playlist edits, HTTP writes |
-| `youtube_update_playlist` | title and description, read back | update/move, details |
+| `youtube_update_playlist` | title, description and privacy, each read back | update/move, details, privacy |
 | `youtube_move_in_playlist` | in a playlist and in Watch Later; not-found and duplicate refusals | update/move, HTTP writes |
 | `youtube_like_video` | on a video that was not liked | ratings |
 | `youtube_remove_rating` | the same video; liked list restored | ratings |
@@ -30,11 +30,21 @@ the account ended as it started. Entries are newest first.
 | `youtube_unsubscribe` | the same channel; subscription set restored | subscriptions |
 | `youtube_set_channel_notifications` | all, none, personalized; unfollowed channel refused | bells |
 
-Not checked live: creating a public playlist through the tool,
+Not checked live: creating a playlist as public in one call (it was made
+public through an update),
 `PLAYLIST_TOO_LONG`, removing a
 dislike, 5xx answers or refusals of live writes, accounts without
 subscriptions, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
+
+## Approved live privacy change check: 2026-11-11
+
+A new playlist created without options read back as `private` after about
+1.5 s. `youtube_update_playlist` then set it to `UNLISTED`, `PUBLIC` and
+`PRIVATE`; each write succeeded and `youtube_get_playlist_details` read the new
+privacy back within about 1.3 s, so the playlist was public for about one
+second. Renaming it afterwards left the privacy `private`, and the playlist
+was deleted.
 
 ## Approved live smoke check with playlist details: 2026-11-11
 

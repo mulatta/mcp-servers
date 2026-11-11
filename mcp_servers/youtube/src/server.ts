@@ -259,15 +259,18 @@ const writeTools: Record<
   },
   youtube_update_playlist: {
     description:
-      "Change the title and/or description of one of the account's PL playlists. Title and description only; privacy cannot be changed.",
+      "Change the title, description and/or privacy (PRIVATE, UNLISTED or PUBLIC) of one of the account's PL playlists. Read them back with youtube_get_playlist_details after a few seconds.",
     input: {
       playlist_id: z.string().regex(userPlaylistId),
       title: z.string().min(1).max(150).optional(),
       description: z.string().max(5000).optional(),
+      privacy: z.enum(["PRIVATE", "UNLISTED", "PUBLIC"]).optional(),
     },
     destructive: false,
     check: (input) =>
-      input.title !== undefined || input.description !== undefined,
+      input.title !== undefined ||
+      input.description !== undefined ||
+      input.privacy !== undefined,
   },
   youtube_move_in_playlist: {
     description:

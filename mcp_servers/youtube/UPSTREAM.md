@@ -147,7 +147,7 @@ Bodies are built here, never by the YouTube.js managers.
 | create playlist | `playlist/create` | `title`, `privacyStatus`, `videoIds: []`, optional `description` | `playlistId` matching `PL` plus 10–64 characters |
 | delete playlist | `playlist/delete` | `playlistId` | none beyond a 2xx answer |
 | add, remove videos | `browse/edit_playlist` | `playlistId`, one `ACTION_ADD_VIDEO` / `ACTION_REMOVE_VIDEO_BY_VIDEO_ID` per video | `status: STATUS_SUCCEEDED` |
-| update playlist | `browse/edit_playlist` | `ACTION_SET_PLAYLIST_NAME`, `ACTION_SET_PLAYLIST_DESCRIPTION` | `status: STATUS_SUCCEEDED` |
+| update playlist | `browse/edit_playlist` | `ACTION_SET_PLAYLIST_NAME`, `ACTION_SET_PLAYLIST_DESCRIPTION`, `ACTION_SET_PLAYLIST_PRIVACY` (`playlistPrivacy`) | `status: STATUS_SUCCEEDED` |
 | move in playlist | `browse/edit_playlist` | `ACTION_MOVE_VIDEO_AFTER` with `setVideoId`, `movedSetVideoIdPredecessor` | `status: STATUS_SUCCEEDED` |
 | like, remove rating | `like/like`, `like/removelike` | `target: { videoId }` | a `likeStatusEntity` mutation with `LIKE` / `INDIFFERENT` |
 | subscribe, unsubscribe | `subscription/subscribe`, `/unsubscribe` | `channelIds`, `params` `EgIIAhgA` / `CgIIAhgA` | `actions[].updateSubscribeButtonAction` with the channel and new state |
@@ -155,6 +155,9 @@ Bodies are built here, never by the YouTube.js managers.
 
 Notes:
 
+- `ACTION_SET_PLAYLIST_PRIVACY` with `playlistPrivacy` is not in YouTube.js;
+  ytmusicapi sends it through the same `browse/edit_playlist` route, and a live
+  check confirmed it on YouTube playlists by reading the privacy back.
 - Removal by video ID needs no prior read, unlike `removeVideos()`, which pages
   through the playlist for set IDs. Live, it removed every entry of the video,
   including a duplicate.

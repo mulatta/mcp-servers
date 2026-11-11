@@ -54,7 +54,7 @@ test("write tool descriptions carry the caveats a caller must know", async () =>
         /top is not possible/,
         /listed twice/,
       ],
-      youtube_update_playlist: [/privacy cannot be changed/],
+      youtube_update_playlist: [/privacy/, /PRIVATE, UNLISTED or PUBLIC/],
       youtube_like_video: [/repeating is harmless/],
       youtube_remove_rating: [/repeating is harmless/],
       youtube_subscribe: [/after ~6 s/],

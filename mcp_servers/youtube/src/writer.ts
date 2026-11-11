@@ -165,6 +165,14 @@ const operations: Record<WriteToolName, Operation> = {
                 playlistDescription: input.description,
               },
             ]),
+        ...(input.privacy === undefined
+          ? []
+          : [
+              {
+                action: "ACTION_SET_PLAYLIST_PRIVACY",
+                playlistPrivacy: input.privacy,
+              },
+            ]),
       ],
     }),
     result: (data, input) => {

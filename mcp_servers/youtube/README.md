@@ -204,7 +204,7 @@ drop a group. A tool whose group is off is neither listed nor callable.
 | `playlist` | `youtube_delete_playlist` | `playlist_id` (`PL…`) | Yes |
 | `playlist` | `youtube_add_to_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | No |
 | `playlist` | `youtube_remove_from_playlist` | `playlist_id` (`PL…` or `WL`), `video_ids` (1–50, unique) | Yes |
-| `playlist` | `youtube_update_playlist` | `playlist_id` (`PL…`), `title` and/or `description` | No |
+| `playlist` | `youtube_update_playlist` | `playlist_id` (`PL…`), any of `title`, `description`, `privacy` | No |
 | `playlist` | `youtube_move_in_playlist` | `playlist_id` (`PL…` or `WL`), `video_id`, `after_video_id` | No |
 | `rating` | `youtube_like_video` | `video_id` | No |
 | `rating` | `youtube_remove_rating` | `video_id` | Yes |
@@ -213,8 +213,7 @@ drop a group. A tool whose group is off is neither listed nor callable.
 | `notification` | `youtube_set_channel_notifications` | `channel_id`, `setting` (`all`, `personalized`, `none`) | No |
 
 Liked videos (`LL`), mixes and uploads lists are not editable as playlists;
-likes change through the rating tools. There are no dislike, comment or
-privacy-change tools.
+likes change through the rating tools. There are no dislike or comment tools.
 
 ### How a write behaves
 
@@ -362,7 +361,7 @@ All 19 tools were checked live on one account on 2026-11-10 and 2026-11-11.
 | Area | Checked live | Not checked live |
 | --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | reads | five items per tool; full paging of Watch Later, playlists, subscriptions; new fields populated; unknown and upload-less channels | accounts with no subscriptions |
-| playlists | create (private; unlisted with description, both read back), delete, add/remove 1–50 videos, rename, move in a playlist and in Watch Later, not-found and duplicate refusals | creating a public playlist through the tool, `PLAYLIST_TOO_LONG` |
+| playlists | create (private; unlisted with description, both read back), delete, add/remove 1–50 videos, rename, privacy changes read back, move in a playlist and in Watch Later, not-found and duplicate refusals | creating a playlist as public in one call, `PLAYLIST_TOO_LONG` |
 | ratings | like and removal on a video that was not liked | removing a dislike |
 | subscriptions | subscribe and unsubscribe a channel that was not followed | — |
 | bells | all, none and personalized on one channel; refusal for an unfollowed channel | — |

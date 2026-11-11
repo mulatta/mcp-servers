@@ -65,7 +65,8 @@ test("update accepts only user playlists and needs a title or description", asyn
     { playlist_id: playlist, title: "" },
     { playlist_id: playlist, title: "x".repeat(151) },
     { playlist_id: playlist, description: "x".repeat(5001) },
-    { playlist_id: playlist, title: "Fixture", privacy: "PUBLIC" },
+    { playlist_id: playlist, privacy: "SECRET" },
+    { playlist_id: playlist, privacy: "public" },
   ])
     expect((await call("youtube_update_playlist", args)).code).toBe("invalid");
   expect(writes).toEqual([]);
@@ -97,6 +98,28 @@ test("update sends one edit naming each changed field", async () => {
         ],
       }),
     },
+  ]);
+});
+
+// ytmusicapi sends the same action through browse/edit_playlist; confirmed live
+// on a YouTube playlist by reading the privacy back.
+test("update can change privacy alone or with other fields", async () => {
+  const { call, writes } = await connect();
+  await call("youtube_update_playlist", {
+    playlist_id: playlist,
+    privacy: "UNLISTED",
+  });
+  await call("youtube_update_playlist", {
+    playlist_id: playlist,
+    title: "T",
+    privacy: "PRIVATE",
+  });
+  expect(writes.map((write) => write.body.actions)).toEqual([
+    [{ action: "ACTION_SET_PLAYLIST_PRIVACY", playlistPrivacy: "UNLISTED" }],
+    [
+      { action: "ACTION_SET_PLAYLIST_NAME", playlistName: "T" },
+      { action: "ACTION_SET_PLAYLIST_PRIVACY", playlistPrivacy: "PRIVATE" },
+    ],
   ]);
 });
 
