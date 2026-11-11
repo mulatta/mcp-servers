@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "bun run typecheck && bun run format:check"
+    "check": "bun run typecheck && bun run format:check",
+    "live:login": "bun --env-file=.env.test tests/live/run.ts login",
+    "live:test": "bun --env-file=.env.test tests/live/run.ts test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

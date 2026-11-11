@@ -1,6 +1,7 @@
-// Drives a running pim-mcp over HTTP against a real Stalwart in the NixOS
-// VM test: every tool, read and write, on a throwaway account. It prints
-// step names and codes only.
+// Drives a running pim-mcp over HTTP against a real Stalwart: in the NixOS
+// VM test, and on the live server's test account (tests/live/run.ts).
+// It exercises every tool, read and write, removes what it made, and
+// prints step names and codes only.
 import { readFileSync } from "node:fs";
 
 const url = new URL(process.env.PIM_VM_URL ?? "http://127.0.0.1:8766/mcp");
@@ -439,6 +440,21 @@ await step("contacts", async () => {
   );
   await call("pim_delete_contact", { contact_id });
   await refused("NOT_FOUND", "pim_get_contact", { contact_id });
+});
+
+await step("clean up", async () => {
+  // The draft sent later is still in Sent; remove everything this run made.
+  const { items } = await call("pim_search_emails", {
+    text: marker,
+    limit: 100,
+  });
+  const ids = items.map((email: Result) => email.email_id);
+  if (ids.length) {
+    await call("pim_trash_emails", { email_ids: ids });
+    await call("pim_destroy_emails", { email_ids: ids });
+  }
+  const left = await call("pim_search_emails", { text: marker });
+  check(left.items.length === 0, "nothing left behind");
 });
 
 console.log("all steps passed");
