@@ -15,6 +15,7 @@ const setErrors: Record<string, ErrorCode> = {
   invalidScript: "INVALID_REQUEST",
   invalidSieve: "INVALID_REQUEST",
   invalidEmail: "INVALID_REQUEST",
+  alreadyExists: "INVALID_REQUEST",
   tooManyRecipients: "INVALID_REQUEST",
   noRecipients: "INVALID_REQUEST",
   invalidRecipients: "INVALID_REQUEST",

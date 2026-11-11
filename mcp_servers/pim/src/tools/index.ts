@@ -21,7 +21,16 @@ import {
   updateMailbox,
 } from "./mail-write.ts";
 import { getEmail, getThread, listIdentities, searchEmails } from "./mail.ts";
-import { getSieveScript, getVacation, listSieveScripts } from "./settings.ts";
+import {
+  activateSieveScript,
+  deleteSieveScript,
+  getSieveScript,
+  getVacation,
+  listSieveScripts,
+  saveSieveScript,
+  setVacation,
+  validateSieveScript,
+} from "./settings.ts";
 
 export const tools: Tool[] = [
   listMailboxes,
@@ -52,4 +61,9 @@ export const tools: Tool[] = [
   deleteDraft,
   sendDraft,
   sendEmail,
+  validateSieveScript,
+  saveSieveScript,
+  activateSieveScript,
+  deleteSieveScript,
+  setVacation,
 ];
