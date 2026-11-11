@@ -5,6 +5,7 @@ import {
   channelVideosParams,
   normalize,
   playlistDetails,
+  type Kind,
   type Page,
 } from "./normalize.ts";
 import { checkResponse } from "./response.ts";
@@ -46,6 +47,49 @@ const scope = (
   paths: new Set(granted.map((route) => routes[route])),
   attempt,
 });
+
+// The browse request and response kind of each list tool.
+const lists: Record<
+  ToolName,
+  { browse: (input: ReadInput) => Record<string, unknown>; kind: Kind }
+> = {
+  youtube_list_playlists: {
+    browse: () => ({ browseId: "FEplaylist_aggregation" }),
+    kind: "playlists",
+  },
+  youtube_get_playlist: {
+    browse: (input) => ({ browseId: `VL${input.playlist_id}` }),
+    kind: "videos",
+  },
+  youtube_get_watch_later: {
+    browse: () => ({ browseId: "VLWL" }),
+    kind: "videos",
+  },
+  youtube_get_liked_videos: {
+    browse: () => ({ browseId: "VLLL" }),
+    kind: "videos",
+  },
+  youtube_get_watch_history: {
+    browse: () => ({ browseId: "FEhistory" }),
+    kind: "history",
+  },
+  youtube_list_subscriptions: {
+    browse: () => ({ browseId: "FEchannels" }),
+    kind: "channels",
+  },
+  // The Videos-tab params skip loading the channel home first.
+  youtube_get_channel_videos: {
+    browse: (input) => ({
+      browseId: input.channel_id,
+      params: channelVideosParams,
+    }),
+    kind: "channel_videos",
+  },
+  youtube_get_subscription_feed: {
+    browse: () => ({ browseId: "FEsubscriptions" }),
+    kind: "subscription_feed",
+  },
+};
 
 export class YoutubeClient {
   private constructor(private client: Innertube) {}
@@ -138,48 +182,18 @@ export class YoutubeClient {
     signal: AbortSignal,
     continuation?: string,
   ): Promise<Page> {
-    const browseId =
-      name === "youtube_list_playlists"
-        ? "FEplaylist_aggregation"
-        : name === "youtube_get_watch_history"
-          ? "FEhistory"
-          : name === "youtube_get_watch_later"
-            ? "VLWL"
-            : name === "youtube_get_liked_videos"
-              ? "VLLL"
-              : name === "youtube_list_subscriptions"
-                ? "FEchannels"
-                : name === "youtube_get_channel_videos"
-                  ? input.channel_id
-                  : `VL${input.playlist_id}`;
-    // Selects the Videos tab, newest first, without first loading the channel home.
-    const params =
-      name === "youtube_get_channel_videos"
-        ? { params: channelVideosParams }
-        : {};
+    const { browse, kind } = lists[name];
     return this.use(signal, async (client) => {
       const response = await stage("upstream.request", () =>
         client.actions.execute(
           "/browse",
           continuation
             ? { continuation, parse: false }
-            : { browseId, ...params, parse: false },
+            : { ...browse(input), parse: false },
         ),
       );
       return stage("normalize", () =>
-        normalize(
-          response.data,
-          name === "youtube_list_playlists"
-            ? "playlists"
-            : name === "youtube_get_watch_history"
-              ? "history"
-              : name === "youtube_list_subscriptions"
-                ? "channels"
-                : name === "youtube_get_channel_videos"
-                  ? "channel_videos"
-                  : "videos",
-          { continuation: !!continuation },
-        ),
+        normalize(response.data, kind, { continuation: !!continuation }),
       );
     });
   }

@@ -26,5 +26,7 @@ items with `modifyChannelNotificationPreferenceEndpoint` params) follows key
 paths seen in a live FEchannels response, with synthetic values.
 `channel-videos.json` is likewise synthetic,
 shaped after the youtubei.js `RichGrid`, `Video` and `LockupView` parsers.
+`subscription-feed.json` is synthetic, shaped after key paths seen in a live
+FEsubscriptions response (sections, lockups, badges, command runs).
 Account settings fixture in `../account.ts` is synthetic and source-derived,
 not a captured response. Live account compatibility remains unverified.

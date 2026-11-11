@@ -4,6 +4,7 @@ import playlists from "../fixtures/library/playlists.json";
 import history from "../fixtures/library/history.json";
 import channels from "../fixtures/library/channels.json";
 import channelVideos from "../fixtures/library/channel-videos.json";
+import subscriptionFeed from "../fixtures/library/subscription-feed.json";
 import { normalize, resultEnvelope } from "../../src/youtube/normalize.ts";
 import { YoutubeClient } from "../../src/youtube/client.ts";
 import { accountPage } from "../fixtures/account.ts";
@@ -28,7 +29,9 @@ test("library reads select fixed endpoints and emit account-bound envelopes", as
                 ? channels
                 : body.browseId === "UCfixture000000000000001"
                   ? channelVideos
-                  : playlist,
+                  : body.browseId === "FEsubscriptions"
+                    ? subscriptionFeed
+                    : playlist,
       );
     },
   });
@@ -63,6 +66,7 @@ test("library reads select fixed endpoints and emit account-bound envelopes", as
       "FEhistory",
       "FEchannels",
       "UCfixture000000000000001",
+      "FEsubscriptions",
     ]);
   } finally {
     server.stop(true);

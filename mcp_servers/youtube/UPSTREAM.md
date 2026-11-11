@@ -65,6 +65,15 @@ YouTube.js changes these files; until then no write goes through a
   differ, so a selected tab with other params reads as no uploads. A made-up
   `UC` ID answered HTTP 200 with an `ERROR` alert "This channel does not
   exist." and no contents.
+- The subscription feed browses `FEsubscriptions` (as `getSubscriptionsFeed()`
+  does). Live, page 1 is one `richGridRenderer` whose `richItemRenderer` video
+  lockups are interleaved with `richSectionRenderer`s: a header-only "Latest"
+  `shelfRenderer`, a "Most relevant" `richShelfRenderer` and a Shorts
+  `richShelfRenderer`; sections are skipped. Continuations carry no contents
+  shell. Both pages add a `resetSubscriptionsUnreadDotCommand` action, which is
+  ignored; any other item-less action fails closed. The channel ID comes from
+  the first metadata row's `commandRuns` browse endpoint; collaborations use an
+  avatar stack that opens a dialog and have none.
 - Playlist continuations now repeat an empty tab shell in `contents` beside
   `onResponseReceivedActions`; continuation reads use only the appended items.
 - A playlist with no videos shows a `messageRenderer` reading "No videos in

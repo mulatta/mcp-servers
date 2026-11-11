@@ -111,6 +111,7 @@ Client configuration (Claude Code):
 | `youtube_list_subscriptions` | Subscribed channels and their bell | None |
 | `youtube_get_channel_videos` | A channel's uploads, newest first | `channel_id` |
 | `youtube_get_playlist_details` | One playlist's title, description, privacy | `playlist_id` |
+| `youtube_get_subscription_feed` | Newest videos from subscribed channels | None |
 
 List tools take optional `limit` (1–100, default 50) and `cursor`;
 `youtube_get_playlist_details` takes only `playlist_id`. All read tools declare
@@ -138,6 +139,7 @@ responses carry identical JSON in `structuredContent` and the text block:
 | video lists | `video_id`, `title`, `url`, `channel_name`, `availability`, `watched_percent`, `duration_seconds` |
 | `youtube_get_watch_history` | video fields plus `watched_at`, `group_label` |
 | `youtube_get_channel_videos` | video fields plus `published_text`; `channel_name` is `null` |
+| `youtube_get_subscription_feed` | video fields plus `published_text`, `channel_id`, `is_upcoming` |
 | `youtube_list_subscriptions` | `channel_id`, `title`, `handle`, `subscriber_count_text`, `notification` |
 
 - `availability`: `available`, `private`, `deleted`, `unavailable` or `null`.
@@ -157,6 +159,12 @@ responses carry identical JSON in `structuredContent` and the text block:
   page header's exact label, or `null` when there is not exactly one. Only the
   account's own playlists carry that label; system lists such as `WL` and `LL`
   and playlists saved from other channels read as `null`.
+
+- The subscription feed lists the chronological feed only; YouTube's "Most
+  relevant" and Shorts shelves on its first page are skipped. `channel_id` is
+  `null` for collaborations, which name several channels. Every feed answer
+  tells the web client to clear the Subscriptions "new videos" dot, so reading
+  the feed may clear it.
 
 - `handle` is the `@name`; `subscriber_count_text` is shown as YouTube displays
   it; `notification` is `all`, `personalized` or `none`, read from the icon of
@@ -357,7 +365,7 @@ counts and timings only. [VERIFICATION.md](VERIFICATION.md) records each run.
 
 ## Verification status
 
-All 19 tools were checked live on one account on 2026-11-10 and 2026-11-11.
+All 20 tools were checked live on one account on 2026-11-10 and 2026-11-11.
 
 | Area | Checked live | Not checked live |
 | --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------- |

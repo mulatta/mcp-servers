@@ -42,6 +42,8 @@ const descriptions: Record<ToolName, string> = {
     "List the channels the authenticated account subscribes to, with each channel's notification setting.",
   youtube_get_channel_videos:
     "Read a channel's uploads, newest first, by channel ID.",
+  youtube_get_subscription_feed:
+    "Read the newest videos from the channels the account subscribes to, newest first, with each video's channel ID (null for collaborations). Reading it may clear the Subscriptions 'new videos' dot in YouTube.",
 };
 
 // Hermes forwards only tool descriptions and error messages to its model, so

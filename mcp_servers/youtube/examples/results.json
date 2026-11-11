@@ -93,5 +93,24 @@
     ],
     "next_cursor": null,
     "has_more": false
+  },
+  "youtube_get_subscription_feed": {
+    "account_id": "UCaaaaaaaaaaaaaaaaaaaaaa",
+    "items": [
+      {
+        "video_id": "v0000000001",
+        "title": "Fixture",
+        "url": "https://www.youtube.com/watch?v=v0000000001",
+        "channel_name": "Fixture",
+        "availability": "available",
+        "watched_percent": null,
+        "duration_seconds": 754,
+        "published_text": "3 hours ago",
+        "channel_id": "UCfixture000000000000001",
+        "is_upcoming": false
+      }
+    ],
+    "next_cursor": null,
+    "has_more": false
   }
 }

@@ -17,6 +17,7 @@ the account ended as it started. Entries are newest first.
 | `youtube_get_watch_history` | five items; four pages, durations on regular videos | browse reads, durations |
 | `youtube_list_subscriptions` | five items; all pages; `all`/`none`/`personalized` bells | browse reads, paging, bells |
 | `youtube_get_playlist_details` | unlisted, private, Watch Later, liked, deleted | details |
+| `youtube_get_subscription_feed` | three pages, field presence; collaborations and upcoming videos | subscription feed |
 | `youtube_get_channel_videos` | five items; upload labels, durations; unknown and upload-less channels | browse reads, durations, channel edge cases |
 | `youtube_create_playlist` | private; unlisted with description, read back; HTTP | create/delete, details, HTTP writes |
 | `youtube_delete_playlist` | removed from the list within 0.5 s | create/delete |
@@ -36,6 +37,19 @@ public through an update),
 dislike, 5xx answers or refusals of live writes, accounts without
 subscriptions, a reverse proxy
 in front of HTTP, and accounts or layouts other than this one.
+
+## Approved live subscription feed check: 2026-11-11
+
+A key-only probe and the investigation before it showed the FEsubscriptions
+layout described in UPSTREAM.md. The first live run of
+`youtube_get_subscription_feed` failed with `UPSTREAM_CHANGED`: filling 100
+items needed the second page, whose unread-dot reset action also carries
+`clickTrackingParams`; the fix ignores that key, with a regression test. Then
+three pages of 100 items each read 300 distinct videos with no repeats across
+pages; every item had a video ID, title and channel name; 291 had a `UC`
+channel ID (the rest were collaborations), 298 an "… ago" label and a
+duration (the two without were upcoming videos marked `is_upcoming`), and 4
+showed progress. Reading the feed may have cleared the Subscriptions dot.
 
 ## Approved live move-to-top check: 2026-11-11
 

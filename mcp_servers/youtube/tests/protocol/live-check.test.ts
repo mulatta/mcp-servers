@@ -39,6 +39,7 @@ test("live check calls every MCP tool with limit five and discovers the playlist
       5,
       2,
       2,
+      2,
       undefined,
     ]);
     // Fixture lockups carry no count badge and only history names channels.
@@ -50,6 +51,7 @@ test("live check calls every MCP tool with limit five and discovers the playlist
       [],
       [],
       ["channel_name"],
+      [],
       // The fixture playlist page has a title but no description or privacy label.
       ["description", "privacy"],
     ]);

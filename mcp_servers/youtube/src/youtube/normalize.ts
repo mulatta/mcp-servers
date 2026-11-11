@@ -20,6 +20,8 @@ const videoSummary = z.strictObject({
   watched_at: z.string().nullable().optional(),
   group_label: z.string().nullable().optional(),
   published_text: z.string().nullable().optional(),
+  channel_id: z.string().nullable().optional(),
+  is_upcoming: z.boolean().optional(),
 });
 const channelSummary = z.strictObject({
   channel_id: z.string().nullable(),
@@ -41,7 +43,12 @@ export type Item =
 export type Page = { items: Item[]; continuation: string | null };
 export type Result = z.infer<typeof resultSchema>;
 export type Kind =
-  "videos" | "playlists" | "history" | "channels" | "channel_videos";
+  | "videos"
+  | "playlists"
+  | "history"
+  | "channels"
+  | "channel_videos"
+  | "subscription_feed";
 
 // Browse params selecting a channel's Videos tab, newest first.
 export const channelVideosParams = "EgZ2aWRlb3PyBgQKAjoA";
@@ -259,6 +266,38 @@ function published(
   }
   return null;
 }
+// Feed lockups link the channel name in their first metadata row; a
+// collaboration opens a dialog instead and has no single channel.
+function linkedChannel(rows: unknown[]): string | null {
+  const part = object(first(object(first(rows)).metadataParts));
+  const runs = object(part.text).commandRuns;
+  const ids = new Set<string>();
+  for (const run of Array.isArray(runs) ? runs : []) {
+    const browseId = object(
+      object(object(object(run).onTap).innertubeCommand).browseEndpoint,
+    ).browseId;
+    const channel = id(browseId, /^UC[A-Za-z0-9_-]{22}$/);
+    if (channel) ids.add(channel);
+  }
+  return ids.size === 1 ? [...ids][0]! : null;
+}
+function badgeTexts(lockup: Record<string, unknown>): string[] {
+  const thumbnail = object(object(lockup.contentImage).thumbnailViewModel);
+  const texts: string[] = [];
+  for (const overlay of Array.isArray(thumbnail.overlays)
+    ? thumbnail.overlays
+    : []) {
+    const o = object(overlay);
+    for (const badge of [
+      object(o.thumbnailOverlayBadgeViewModel).thumbnailBadges,
+      object(o.thumbnailBottomOverlayViewModel).badges,
+    ].flatMap((list) => (Array.isArray(list) ? list : []))) {
+      const value = object(object(badge).thumbnailBadgeViewModel).text;
+      if (typeof value === "string") texts.push(value);
+    }
+  }
+  return texts;
+}
 function id(value: unknown, pattern: RegExp): string | null {
   return typeof value === "string" && pattern.test(value) ? value : null;
 }
@@ -378,6 +417,12 @@ export function normalize(
     }
     if (n.richItemRenderer)
       return walk(object(n.richItemRenderer).content, group);
+    // The feed's sections hold a header-only "Latest" shelf and the "Most
+    // relevant" and Shorts shelves, which reorder or repeat feed items.
+    if (n.richSectionRenderer && kind === "subscription_feed") {
+      recognized = true;
+      return;
+    }
     if (n.shelfRenderer) return walk(object(n.shelfRenderer).content, group);
     if (n.continuationItemRenderer || n.continuationItemViewModel) {
       recognized = true;
@@ -501,6 +546,13 @@ export function normalize(
         ...(kind === "channel_videos"
           ? { published_text: published(v, rows) }
           : {}),
+        ...(kind === "subscription_feed"
+          ? {
+              published_text: published(v, rows),
+              channel_id: linkedChannel(rows),
+              is_upcoming: badgeTexts(lockup).includes("Upcoming"),
+            }
+          : {}),
       });
     }
     recognized = true;
@@ -524,6 +576,16 @@ export function normalize(
       response.onResponseReceivedActions ??
       response.onResponseReceivedEndpoints;
     for (const action of list(actions)) {
+      // Every feed answer also tells the client to clear the Subscriptions dot.
+      const keys = Object.keys(object(action)).filter(
+        (key) => key !== "clickTrackingParams",
+      );
+      if (
+        kind === "subscription_feed" &&
+        keys.length === 1 &&
+        keys[0] === "resetSubscriptionsUnreadDotCommand"
+      )
+        continue;
       const items = object(
         object(action).appendContinuationItemsAction,
       ).continuationItems;

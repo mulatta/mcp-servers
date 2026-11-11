@@ -89,12 +89,17 @@ export async function checkTools(client: Client): Promise<CheckReport[]> {
       // shortcut: field moves inside known lockups are caught only by this live check,
       // move field extraction onto youtubei.js parsers if another such fix is needed.
       const nullFields = result.items.length
-        ? ["video_count", "channel_name", "handle", "notification"].filter(
-            (field) =>
-              result.items.every(
-                (item) =>
-                  field in item && item[field as keyof typeof item] === null,
-              ),
+        ? [
+            "video_count",
+            "channel_name",
+            "channel_id",
+            "handle",
+            "notification",
+          ].filter((field) =>
+            result.items.every(
+              (item) =>
+                field in item && item[field as keyof typeof item] === null,
+            ),
           )
         : [];
       reports.push({

@@ -9,6 +9,7 @@ export const toolNames = [
   "youtube_get_watch_history",
   "youtube_list_subscriptions",
   "youtube_get_channel_videos",
+  "youtube_get_subscription_feed",
 ] as const;
 export type ToolName = (typeof toolNames)[number];
 // Read tools that return one object instead of a page of items.

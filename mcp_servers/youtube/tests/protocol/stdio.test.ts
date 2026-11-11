@@ -9,6 +9,7 @@ const names = [
   "youtube_get_liked_videos",
   "youtube_get_playlist",
   "youtube_get_playlist_details",
+  "youtube_get_subscription_feed",
   "youtube_get_watch_history",
   "youtube_get_watch_later",
   "youtube_list_playlists",
