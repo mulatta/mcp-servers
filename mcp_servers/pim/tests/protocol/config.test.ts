@@ -17,31 +17,32 @@ const code = (run: () => unknown) => {
 };
 
 describe("server configuration", () => {
-  test("reads the origin, client and state directory", () => {
+  const account = {
+    PIM_USERNAME: "tester",
+    PIM_PASSWORD_FILE: "/run/credentials/pim/password",
+  };
+
+  test("reads the origin, the login name and the password file", () => {
     expect(
-      readServer({
-        PIM_SERVER_URL: "https://mail.example.test",
-        PIM_STATE_DIR: "/var/lib/pim",
-      }),
+      readServer({ PIM_SERVER_URL: "https://mail.example.test", ...account }),
     ).toEqual({
       origin: "https://mail.example.test",
-      clientId: "pim-mcp",
-      stateDir: "/var/lib/pim",
+      username: "tester",
+      passwordFile: "/run/credentials/pim/password",
     });
   });
 
-  test("falls back to systemd and XDG state directories", () => {
-    const base = { PIM_SERVER_URL: "https://mail.example.test" };
-    expect(
-      readServer({ ...base, STATE_DIRECTORY: "/var/lib/a:/var/lib/b" })
-        .stateDir,
-    ).toBe("/var/lib/a");
-    expect(readServer({ ...base, XDG_STATE_HOME: "/x" }).stateDir).toBe(
-      "/x/pim-mcp",
-    );
-    expect(readServer({ ...base, HOME: "/home/u" }).stateDir).toBe(
-      "/home/u/.local/state/pim-mcp",
-    );
+  test("refuses a missing or unusable login name or password file", () => {
+    const url = { PIM_SERVER_URL: "https://mail.example.test" };
+    for (const env of [
+      { ...url, PIM_PASSWORD_FILE: "/p" },
+      { ...url, PIM_USERNAME: "tester" },
+      // Basic authentication splits the login name at the first colon.
+      { ...url, PIM_USERNAME: "a:b", PIM_PASSWORD_FILE: "/p" },
+      { ...url, PIM_USERNAME: "a\nb", PIM_PASSWORD_FILE: "/p" },
+      { ...url, PIM_USERNAME: "x".repeat(257), PIM_PASSWORD_FILE: "/p" },
+    ])
+      expect(code(() => readServer(env))).toBe("INVALID_ACCOUNT");
   });
 
   test("accepts only a bare HTTPS origin, or HTTP on loopback", () => {
@@ -53,29 +54,17 @@ describe("server configuration", () => {
       "https://mail.example.test/jmap",
       "https://mail.example.test/?a=1",
     ])
-      expect(code(() => readServer({ PIM_SERVER_URL: url, HOME: "/h" }))).toBe(
+      expect(code(() => readServer({ PIM_SERVER_URL: url, ...account }))).toBe(
         "INVALID_SERVER",
       );
     expect(
-      readServer({ PIM_SERVER_URL: "http://127.0.0.1:8080", HOME: "/h" })
+      readServer({ PIM_SERVER_URL: "http://127.0.0.1:8080", ...account })
         .origin,
     ).toBe("http://127.0.0.1:8080");
     expect(
-      readServer({ PIM_SERVER_URL: "http://localhost:8080/", HOME: "/h" })
+      readServer({ PIM_SERVER_URL: "http://localhost:8080/", ...account })
         .origin,
     ).toBe("http://localhost:8080");
-  });
-
-  test("rejects a client ID with unexpected characters", () => {
-    expect(
-      code(() =>
-        readServer({
-          PIM_SERVER_URL: "https://mail.example.test",
-          PIM_CLIENT_ID: "a b",
-          HOME: "/h",
-        }),
-      ),
-    ).toBe("INVALID_SERVER");
   });
 });
 

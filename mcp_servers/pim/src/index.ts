@@ -1,7 +1,6 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { readFile } from "node:fs/promises";
-import { login } from "./auth/login.ts";
-import { Credentials, TokenStore } from "./auth/tokens.ts";
+import { Password } from "./auth/password.ts";
 import {
   ConfigError,
   readLogLevel,
@@ -28,26 +27,15 @@ async function readToken(path: string) {
   return token;
 }
 
-/** `pim-mcp login`: the one interactive step, run by the operator. */
-async function runLogin() {
-  let config: ServerConfig;
+async function readPassword(path: string) {
+  let password;
   try {
-    config = readServer();
+    password = (await readFile(path, "utf8")).replace(/\r?\n$/, "");
   } catch {
-    console.error(
-      "Set PIM_SERVER_URL to the Stalwart origin, e.g. https://mail.example.org.",
-    );
-    process.exit(2);
+    throw new ConfigError("INVALID_ACCOUNT");
   }
-  try {
-    await login(config, new TokenStore(config.stateDir), {
-      print: (line) => console.error(line),
-    });
-    process.exit(0);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : "Login failed.");
-    process.exit(1);
-  }
+  if (!password) throw new ConfigError("INVALID_ACCOUNT");
+  return password;
 }
 
 export async function start(options: { timeoutMs?: number } = {}) {
@@ -84,9 +72,11 @@ export async function start(options: { timeoutMs?: number } = {}) {
     let server: ServerConfig;
     let transport: TransportConfig;
     let token = "";
+    let password: string;
     let writes: ReadonlySet<WriteGroup>;
     try {
       server = readServer();
+      password = await readPassword(server.passwordFile);
       writes = readWrites();
       transport = readTransport();
       if (transport.kind === "http")
@@ -94,24 +84,18 @@ export async function start(options: { timeoutMs?: number } = {}) {
     } catch (error) {
       return refuse(error);
     }
-    const credentials = new Credentials(
-      server,
-      new TokenStore(server.stateDir),
-      {
-        logger: diagnostics,
-      },
-    );
+    const credentials = new Password(server.username, password, {
+      logger: diagnostics,
+    });
     const jmap = new Jmap(server, credentials, { logger: diagnostics });
     // Logged so an operator can see from the journal whether writes are on.
     const started = writes.size ? { writes: [...writes] } : {};
     let closing = false;
     let close = async () => {};
-    const stopRefresh = credentials.startBackground();
     const stop = async (reason: "SIGINT" | "SIGTERM" | "transport_closed") => {
       if (closing || failing) return;
       closing = true;
       try {
-        stopRefresh();
         await close();
         diagnostics.emit({ event: "server.stop", reason });
         await diagnostics.close();
@@ -153,9 +137,9 @@ export async function start(options: { timeoutMs?: number } = {}) {
 }
 
 if (import.meta.main) {
-  if (process.argv[2] === "login") await runLogin();
-  else if (process.argv.length > 2) {
-    console.error("Usage: pim-mcp [login]");
+  if (process.argv.length > 2) {
+    console.error("Usage: pim-mcp");
     process.exit(2);
-  } else await start();
+  }
+  await start();
 }

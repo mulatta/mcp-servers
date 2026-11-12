@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { SafeError } from "../../src/errors.ts";
 import { using, type Attempt } from "../../src/jmap/client.ts";
-import { accountId, session } from "../fixtures/stalwart.ts";
+import { accountId, session, username } from "../fixtures/stalwart.ts";
 import { signedIn, type SignedIn } from "../fixtures/setup.ts";
 import { captureLogs } from "../fixtures/log.ts";
 
@@ -19,7 +19,7 @@ const codeOf = async (promise: Promise<unknown>) =>
   );
 const fresh = (): Attempt => ({ dispatched: false });
 
-test("calls carry the account, capabilities and bearer token; the session is fetched once", async () => {
+test("calls carry the account, capabilities and password; the session is fetched once", async () => {
   env.stalwart.jmap = (calls) =>
     calls.map(([name, , id]) => [name, { list: [], seen: name }, id]);
   const first = await env.jmap.call(
@@ -33,7 +33,7 @@ test("calls carry the account, capabilities and bearer token; the session is fet
   const request = env.stalwart.jmapRequests[0]!;
   expect(request.using).toEqual([using.core, using.mail]);
   expect(request.calls[0]![1]).toEqual({ ids: null, accountId });
-  expect(env.stalwart.accessTokens.has(request.token)).toBe(true);
+  expect(request.user).toBe(username);
 });
 
 test("results are matched to calls by ID, not position", async () => {
@@ -55,7 +55,7 @@ test("results are matched to calls by ID, not position", async () => {
   expect(results).toEqual([{ id: "c0" }, { id: "c1" }]);
 });
 
-test("an API URL on another origin is refused before the token is sent there", async () => {
+test("an API URL on another origin is refused before the password is sent there", async () => {
   const original = env.stalwart.origin;
   env.stalwart.jmap = () => [];
   const spoofed = {
@@ -77,23 +77,31 @@ test("an API URL on another origin is refused before the token is sent there", a
   ).toBe("UPSTREAM_CHANGED");
 });
 
-test("a refused access token is refreshed and the request sent once more", async () => {
-  env.stalwart.jmap = (calls) => calls.map(([name, , id]) => [name, {}, id]);
-  await env.jmap.call(["mail"], [["Mailbox/get", {}]], signal());
-  env.stalwart.accessTokens.clear();
-  await env.jmap.call(["mail"], [["Mailbox/get", {}]], signal());
-  const refreshes = env.stalwart.tokenRequests.filter(
-    (form) => form.get("grant_type") === "refresh_token",
-  );
-  expect(refreshes).toHaveLength(2);
-  expect(env.stalwart.jmapRequests).toHaveLength(2);
+test("a refused password is not sent again", async () => {
+  // Stalwart bans an address after repeated failed sign-ins, and the
+  // password can only change with a restart.
+  env.stalwart.passwords.clear();
+  for (let i = 0; i < 3; i++)
+    expect(
+      await codeOf(env.jmap.call(["mail"], [["Mailbox/get", {}]], signal())),
+    ).toBe("AUTH_REQUIRED");
+  expect(env.stalwart.refused).toBe(1);
 });
 
-test("a token refused twice means the login is gone", async () => {
+test("a write refused for its password did not run", async () => {
   env.stalwart.jmap = () => new Response(null, { status: 401 });
+  const attempt = fresh();
+  expect(
+    await codeOf(
+      env.jmap.call(["mail"], [["Email/set", {}]], signal(), { attempt }),
+    ),
+  ).toBe("AUTH_REQUIRED");
+  expect(attempt.dispatched).toBe(false);
   expect(
     await codeOf(env.jmap.call(["mail"], [["Mailbox/get", {}]], signal())),
   ).toBe("AUTH_REQUIRED");
+  // Only the refused write reached the server.
+  expect(env.stalwart.jmapRequests).toHaveLength(1);
 });
 
 test("method errors map to fixed codes", async () => {
@@ -178,6 +186,22 @@ test("a write records its methods and whether it was answered, nothing else", as
     http_status: 200,
   });
   expect(JSON.stringify(records)).not.toMatch(
-    /secret-id|private|refresh-synthetic/,
+    /secret-id|private|app-password-synthetic/,
   );
+});
+
+test("a refused password is logged once, without the account", async () => {
+  const { logger, records, flush } = captureLogs();
+  env.stop();
+  env = await signedIn({ logger });
+  env.stalwart.passwords.clear();
+  for (let i = 0; i < 2; i++)
+    await env.jmap
+      .call(["mail"], [["Mailbox/get", {}]], signal())
+      .catch(() => {});
+  await flush();
+  expect(records.filter((record) => record.event === "auth.rejected")).toEqual([
+    expect.objectContaining({ event: "auth.rejected", level: "error" }),
+  ]);
+  expect(JSON.stringify(records)).not.toMatch(/tester|app-password/);
 });

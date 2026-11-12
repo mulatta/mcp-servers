@@ -1,7 +1,6 @@
 import { z } from "zod";
-import type { ServerConfig } from "../config.ts";
 import { SafeError, type ErrorCode } from "../errors.ts";
-import type { Credentials } from "../auth/tokens.ts";
+import type { Password } from "../auth/password.ts";
 import type { Logger } from "../observability/logger.ts";
 
 export const using = {
@@ -67,7 +66,7 @@ interface Session {
 }
 
 /**
- * JMAP over HTTP for the signed-in account. The bearer token goes only to the
+ * JMAP over HTTP for the signed-in account. The password goes only to the
  * configured origin: a session naming an API elsewhere is refused.
  */
 export class Jmap {
@@ -78,8 +77,8 @@ export class Jmap {
   private logger: Logger | undefined;
 
   constructor(
-    private config: ServerConfig,
-    private credentials: Credentials,
+    private config: { origin: string },
+    private credentials: Password,
     options: { fetch?: typeof fetch; logger?: Logger | undefined } = {},
   ) {
     this.fetch = options.fetch ?? fetch;
@@ -94,8 +93,7 @@ export class Jmap {
   /**
    * Sends calls in one request and returns each call's arguments, in call
    * order. Call IDs are c0, c1, ... so later calls can reference earlier
-   * results. With `attempt`, the request is a write: it is never sent twice,
-   * except after a 401, which Stalwart answers before running anything.
+   * results. With `attempt`, the request is a write: it is never sent twice.
    */
   async call(
     capabilities: Capability[],
@@ -104,68 +102,57 @@ export class Jmap {
     options: { attempt?: Attempt } = {},
   ): Promise<Args[]> {
     const write = options.attempt;
-    for (let tries = 0; ; tries++) {
-      const token = await this.credentials.accessToken(signal);
-      const session = await this.currentSession(signal, token);
-      const body = JSON.stringify({
-        using: [using.core, ...capabilities.map((name) => using[name])],
-        methodCalls: calls.map(([method, args], index) => [
-          method,
-          { accountId: session.accountId, ...args },
-          `c${index}`,
-        ]),
+    const authorization = this.credentials.authorization();
+    const session = await this.currentSession(signal);
+    const body = JSON.stringify({
+      using: [using.core, ...capabilities.map((name) => using[name])],
+      methodCalls: calls.map(([method, args], index) => [
+        method,
+        { accountId: session.accountId, ...args },
+        `c${index}`,
+      ]),
+    });
+    if (write) write.dispatched = true;
+    let response: Response;
+    try {
+      response = await this.fetch(session.apiUrl, {
+        method: "POST",
+        headers: { authorization, "content-type": "application/json" },
+        body,
+        redirect: "error",
+        signal,
       });
-      if (write) write.dispatched = true;
-      let response: Response;
-      try {
-        response = await this.fetch(session.apiUrl, {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${token}`,
-            "content-type": "application/json",
-          },
-          body,
-          redirect: "error",
-          signal,
-        });
-      } catch {
-        throw this.failed(calls, write, "UPSTREAM_UNAVAILABLE");
-      }
-      if (response.status === 401) {
-        if (write) write.dispatched = false;
-        this.credentials.invalidate(token);
-        this.session = undefined;
-        if (tries > 0) throw new SafeError("AUTH_REQUIRED");
-        await this.credentials.refresh("unauthorized");
-        continue;
-      }
-      if (response.status === 429) {
-        this.record(calls, write, false, response.status);
-        throw new SafeError("RATE_LIMITED");
-      }
-      // Request-level problems (RFC 8620 3.6.1) are refused before any method runs.
-      if (response.status === 400 && !write)
-        throw new SafeError("UPSTREAM_CHANGED");
-      if (!response.ok)
-        throw this.failed(
-          calls,
-          write,
-          "UPSTREAM_UNAVAILABLE",
-          response.status,
-        );
-      const parsed = responseSchema.safeParse(
-        await response.json().catch(() => undefined),
-      );
-      if (!parsed.success)
-        throw this.failed(calls, write, "UPSTREAM_CHANGED", response.status);
-      this.record(calls, write, true, response.status);
-      if (
-        parsed.data.sessionState &&
-        parsed.data.sessionState !== this.sessionState
-      )
-        this.session = undefined;
-      return this.results(calls, parsed.data.methodResponses, write);
+    } catch {
+      throw this.failed(calls, write, "UPSTREAM_UNAVAILABLE");
     }
+    // Stalwart checks credentials before running any method.
+    if (response.status === 401) {
+      if (write) write.dispatched = false;
+      this.session = undefined;
+      this.credentials.reject();
+      throw new SafeError("AUTH_REQUIRED");
+    }
+    if (response.status === 429) {
+      this.record(calls, write, false, response.status);
+      throw new SafeError("RATE_LIMITED");
+    }
+    // Request-level problems (RFC 8620 3.6.1) are refused before any method runs.
+    if (response.status === 400 && !write)
+      throw new SafeError("UPSTREAM_CHANGED");
+    if (!response.ok)
+      throw this.failed(calls, write, "UPSTREAM_UNAVAILABLE", response.status);
+    const parsed = responseSchema.safeParse(
+      await response.json().catch(() => undefined),
+    );
+    if (!parsed.success)
+      throw this.failed(calls, write, "UPSTREAM_CHANGED", response.status);
+    this.record(calls, write, true, response.status);
+    if (
+      parsed.data.sessionState &&
+      parsed.data.sessionState !== this.sessionState
+    )
+      this.session = undefined;
+    return this.results(calls, parsed.data.methodResponses, write);
   }
 
   private results(
@@ -215,56 +202,44 @@ export class Jmap {
     });
   }
 
-  private currentSession(
-    signal: AbortSignal,
-    token?: string,
-  ): Promise<Session> {
-    this.session ??= this.fetchSession(signal, token).catch((error) => {
+  private currentSession(signal: AbortSignal): Promise<Session> {
+    this.session ??= this.fetchSession(signal).catch((error) => {
       this.session = undefined;
       throw error;
     });
     return this.session;
   }
 
-  private async fetchSession(
-    signal: AbortSignal,
-    given?: string,
-  ): Promise<Session> {
-    for (let tries = 0; ; tries++) {
-      const token = given ?? (await this.credentials.accessToken(signal));
-      given = undefined;
-      const response = await this.fetch(`${this.config.origin}/jmap/session`, {
-        headers: { authorization: `Bearer ${token}` },
-        redirect: "error",
-        signal,
-      }).catch(() => {
-        throw new SafeError("UPSTREAM_UNAVAILABLE");
-      });
-      if (response.status === 401) {
-        this.credentials.invalidate(token);
-        if (tries > 0) throw new SafeError("AUTH_REQUIRED");
-        await this.credentials.refresh("unauthorized");
-        continue;
-      }
-      if (response.status === 429) throw new SafeError("RATE_LIMITED");
-      if (!response.ok) throw new SafeError("UPSTREAM_UNAVAILABLE");
-      const parsed = sessionSchema.safeParse(
-        await response.json().catch(() => undefined),
-      );
-      if (!parsed.success) throw new SafeError("UPSTREAM_CHANGED");
-      const { apiUrl, primaryAccounts, username, state } = parsed.data;
-      let api: URL;
-      try {
-        api = new URL(apiUrl);
-      } catch {
-        throw new SafeError("UPSTREAM_CHANGED");
-      }
-      if (api.origin !== this.config.origin)
-        throw new SafeError("UPSTREAM_CHANGED");
-      const accountId = primaryAccounts[using.mail];
-      if (!accountId) throw new SafeError("UPSTREAM_CHANGED");
-      this.sessionState = state;
-      return { apiUrl: api.href, accountId, username };
+  private async fetchSession(signal: AbortSignal): Promise<Session> {
+    const response = await this.fetch(`${this.config.origin}/jmap/session`, {
+      headers: { authorization: this.credentials.authorization() },
+      redirect: "error",
+      signal,
+    }).catch(() => {
+      throw new SafeError("UPSTREAM_UNAVAILABLE");
+    });
+    if (response.status === 401) {
+      this.credentials.reject();
+      throw new SafeError("AUTH_REQUIRED");
     }
+    if (response.status === 429) throw new SafeError("RATE_LIMITED");
+    if (!response.ok) throw new SafeError("UPSTREAM_UNAVAILABLE");
+    const parsed = sessionSchema.safeParse(
+      await response.json().catch(() => undefined),
+    );
+    if (!parsed.success) throw new SafeError("UPSTREAM_CHANGED");
+    const { apiUrl, primaryAccounts, username, state } = parsed.data;
+    let api: URL;
+    try {
+      api = new URL(apiUrl);
+    } catch {
+      throw new SafeError("UPSTREAM_CHANGED");
+    }
+    if (api.origin !== this.config.origin)
+      throw new SafeError("UPSTREAM_CHANGED");
+    const accountId = primaryAccounts[using.mail];
+    if (!accountId) throw new SafeError("UPSTREAM_CHANGED");
+    this.sessionState = state;
+    return { apiUrl: api.href, accountId, username };
   }
 }

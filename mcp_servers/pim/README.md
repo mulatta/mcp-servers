@@ -2,14 +2,14 @@
 
 MCP server for one Stalwart account, written in Bun and TypeScript. It reads
 the account's mail, calendars, contacts, vacation reply and Sieve filters over
-JMAP and, when enabled per group, changes them. It signs in once with an OAuth
-device login; only the refresh token is stored. The server speaks MCP over
-stdio or authenticated HTTP.
+JMAP and, when enabled per group, changes them. It signs in with a password
+issued for it alone, which the account's owner can revoke without touching
+any other client. The server speaks MCP over stdio or authenticated HTTP.
 
 - Reads are always available. Writes are off unless `PIM_WRITES` names their
   group; drafting and sending are separate groups.
-- Stalwart does not enforce OAuth scopes: the token can do whatever the account
-  can, so the write groups are the only restriction this server adds.
+- The password can do whatever the account can, so the write groups are the
+  only restriction this server adds.
 - [UPSTREAM.md](UPSTREAM.md) records the Stalwart behaviour the server depends
   on, including where Stalwart 0.15 departs from the JMAP specifications.
 - [DEVELOPMENT.md](DEVELOPMENT.md) covers the development shell, the protocol
@@ -20,8 +20,8 @@ stdio or authenticated HTTP.
 | Variable | Default | Meaning |
 | ------------------------ | ------------------------------- | --------------------------------------------------------- |
 | `PIM_SERVER_URL` | required | Origin of the Stalwart HTTP listener, such as `https://mail.example.org` |
-| `PIM_CLIENT_ID` | `pim-mcp` | OAuth client ID registered in Stalwart |
-| `PIM_STATE_DIR` | see below | Directory of the token file |
+| `PIM_USERNAME` | required | Login name of the account |
+| `PIM_PASSWORD_FILE` | required | File holding the server's password on one line |
 | `PIM_WRITES` | unset (read-only) | Write groups to expose, see [Writes](#writes) |
 | `PIM_LOG_LEVEL` | `info` | `error`, `warn`, `info` or `debug` |
 | `PIM_TRANSPORT` | `stdio` | `stdio` or `http` |
@@ -31,82 +31,52 @@ stdio or authenticated HTTP.
 | `PIM_HTTP_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated hostnames accepted in `Host` |
 
 `PIM_SERVER_URL` must be a bare HTTPS origin; plain HTTP is accepted only for
-`localhost`, `127.0.0.1` and `[::1]`. The token directory is `PIM_STATE_DIR`,
-else the first entry of systemd's `STATE_DIRECTORY`, else
-`$XDG_STATE_HOME/pim-mcp`, else `~/.local/state/pim-mcp`.
+`localhost`, `127.0.0.1` and `[::1]`. The login name may not contain a colon
+or control characters.
 
 Any invalid value logs `config.invalid` with a fixed code (`INVALID_LOG_LEVEL`,
-`INVALID_SERVER`, `INVALID_TRANSPORT`, `INVALID_HTTP_CONFIG`, `INVALID_WRITES`)
+`INVALID_SERVER`, `INVALID_ACCOUNT`, `INVALID_TRANSPORT`, `INVALID_HTTP_CONFIG`, `INVALID_WRITES`)
 and exits 1 before serving. The flakelet module exposes the same settings as
-`serverUrl`, `clientId`, `listenAddress`, `port`, `allowedHosts`, `tokenFile`,
-`logLevel` and `writes`.
+`serverUrl`, `username`, `passwordFile`, `listenAddress`, `port`,
+`allowedHosts`, `tokenFile`, `logLevel` and `writes`; it loads both files with
+systemd's `LoadCredential=`.
 
 ## Signing in
 
-The server uses Stalwart's OAuth 2.0 device authorization (RFC 8628) for the
-client in `PIM_CLIENT_ID`. Register that client in Stalwart first (a principal
-of type `oauthClient`); with `oauth.client-registration.require = true`
-Stalwart refuses unregistered clients.
+The server sends the login name and password with HTTP Basic authentication
+on every request; the password stays in memory and is never logged. Issue a
+password for this server alone, so that revoking it cuts off this server and
+nothing else. With Stalwart's directory in Kanidm:
 
-1. Run `pim-mcp login` with the same `PIM_SERVER_URL` and state directory as
-   the server. It prints an address and a code.
-1. Open the address, sign in to Stalwart as the account the server should use,
-   and approve the code. The code expires after 30 minutes.
-1. Login writes `token.json` to the state directory and names the account it
-   signed in. A running server picks it up on its next request; no restart is
-   needed.
+1. Kanidm application passwords authenticate LDAP binds whose DN names the
+   application. Create an application linked to the group allowed to use mail,
+   and have Stalwart bind through it (template
+   `spn={username}@<kanidm domain>,app=<application>,<base DN>`). Mail then
+   accepts only application passwords, issued per client.
+1. As the account's owner, issue a password for the application labelled for
+   this server, and put it in `PIM_PASSWORD_FILE`.
+1. To revoke the server's access, the owner deletes that password in Kanidm.
+   Stalwart checks the password with Kanidm on every request, so the next
+   request is refused.
 
-With the flakelet module, the login is a unit of its own, run once after
-deployment and again whenever the server reports `AUTH_REQUIRED`:
+Stalwart's own application passwords do not work with an LDAP directory that
+checks passwords by binding: Stalwart passes the password to the directory and
+never consults the ones it stores (see [UPSTREAM.md](UPSTREAM.md)).
 
-```sh
-sudo systemctl start --no-block pim-mcp-login.service
-journalctl -fu pim-mcp-login.service   # shows the address and code
-```
-
-It runs as the server's dynamic user with the same state directory
-(`/var/lib/private/pim-mcp`), so the server can read the token it writes.
-
-### Tokens
-
-- Access tokens last one hour and live only in memory; the server refreshes one
-  a minute before it expires.
-- The refresh token lasts 30 days. Stalwart issues a new one only when a
-  refresh happens in the old one's last four days, so the server refreshes at
-  start and every 24 hours, and an idle server stays signed in.
-- A refresh request in progress is shared: the daily refresh, a request that
-  found its token expired and a retry after a 401 send one exchange.
-- A new refresh token replaces `token.json` atomically: it is written to a
-  temporary file (mode 0600) in the same directory, flushed, renamed over the
-  old file and the directory flushed. A process killed at any point leaves the
-  old or the new token, never a partial file.
-- If that save fails, the server keeps working: Stalwart keeps accepting the
-  previous refresh token until it expires. The failure is logged as
-  `state.write_failed` with code `STATE_WRITE_FAILED`, and every later refresh
-  tries the save again.
-
-### When the sign-in ends
-
-| Situation | Result |
-| ------------------------------------------------------ | ------------------------------------------------------------- |
-| No token file, or one for another server or client | Every tool returns `AUTH_REQUIRED`; nothing is sent |
-| Stalwart refuses the refresh token (expired, revoked) | `AUTH_REQUIRED`; the token file is read again on the next call |
-| Stalwart is unreachable or answers 5xx on refresh | `UPSTREAM_UNAVAILABLE`; the token is kept |
-| A JMAP request answers 401 | One refresh and one resend; a second 401 is `AUTH_REQUIRED` |
-
-There is no automatic re-login: only an operator can approve a device code.
-
-To revoke the server's access, stop it and delete `token.json`, remove the
-account's access to mail, or rotate Stalwart's OAuth signing key. Changing the
-account password revokes refresh tokens only when Stalwart's directory exposes
-a password hash; a directory that maps the secret to a fixed attribute does not.
+When Stalwart refuses the password, the call returns `AUTH_REQUIRED`, the
+server logs `auth.rejected` and sends nothing more until it restarts: Stalwart
+bans an address after repeated failed sign-ins (100 a day by default), and a
+new password only arrives with a restart. To restore access, write a new
+password to the file and restart the server.
 
 ## Run over stdio
 
-From `mcp_servers/pim`, with `PIM_SERVER_URL` set, run `bun run start`.
+From `mcp_servers/pim`, with `PIM_SERVER_URL`, `PIM_USERNAME` and
+`PIM_PASSWORD_FILE` set, run `bun run start`.
 Configure an MCP client with command `bun`, arguments `run src/index.ts`, and
 the absolute path of `mcp_servers/pim` as working directory. Stdout carries only
-MCP messages; diagnostics go to stderr. Tool discovery needs no sign-in.
+MCP messages; diagnostics go to stderr. Tool discovery sends nothing to
+Stalwart.
 
 ## Run over HTTP
 
@@ -229,7 +199,7 @@ sent).
 
 | Code | Meaning and what to do |
 | ----------------------- | --------------------------------------------------------------------------- |
-| `AUTH_REQUIRED` | Not signed in, or the sign-in expired or was revoked. Run the login again. |
+| `AUTH_REQUIRED` | Stalwart refused the password, which may be revoked. Issue a new one and restart. |
 | `NOT_FOUND` | The item does not exist or this account cannot see it. |
 | `INVALID_REQUEST` | Stalwart rejected the input, or an occurrence was targeted. |
 | `CURSOR_INVALID` | The cursor does not belong to these inputs. Start without a cursor. |
@@ -248,10 +218,8 @@ sent).
 
 Records are JSONL on stderr with `schema_version: 1`, UTC `timestamp`, `level`
 and a fixed `event`. Fields are limited to fixed names, counts, durations, HTTP
-statuses, safe codes and JMAP method names. Tokens, device codes, account names,
-addresses, IDs, subjects and bodies have no field and are never logged. The
-`login` command prints the address, code and account name to the operator's
-terminal (or the login unit's journal), never a token.
+statuses, safe codes and JMAP method names. Passwords, tokens, account names,
+addresses, IDs, subjects and bodies have no field and are never logged.
 
 | Event | Level | Content |
 | -------------------- | ---------- | ------------------------------------------------------------ |
@@ -260,8 +228,7 @@ terminal (or the login unit's journal), never a token.
 | `server.fatal` | error | fixed code `PROCESS_FAILURE` |
 | `config.invalid` | error | configuration code |
 | `http.rejected` | warn | HTTP status |
-| `auth.refresh` | info, warn | trigger (`request`, `background`, `unauthorized`), outcome, whether the token rotated, safe code, HTTP status, duration |
-| `state.write_failed` | error | `STATE_WRITE_FAILED` |
+| `auth.rejected` | error | none; Stalwart refused the password |
 | `request.end` | info, warn | tool, outcome, safe code, returned count, duration |
 | `upstream.write` | debug | JMAP methods of a sent write, whether it was answered, HTTP status |
 | `logs.dropped` | warn | records lost to backpressure |
@@ -269,5 +236,5 @@ terminal (or the login unit's journal), never a token.
 ## Verification status
 
 [VERIFICATION.md](VERIFICATION.md) records each run. Every tool has been checked
-against a real Stalwart 0.15.5 in the NixOS VM test; the live server has not
-been checked yet.
+against a real Stalwart 0.15.5 in the NixOS VM test; on the production server,
+only the read tools have been checked.

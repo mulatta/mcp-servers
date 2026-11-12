@@ -1,41 +1,28 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { Credentials, TokenStore } from "../../src/auth/tokens.ts";
+import { Password } from "../../src/auth/password.ts";
 import { Jmap } from "../../src/jmap/client.ts";
 import type { Logger } from "../../src/observability/logger.ts";
-import { startStalwart, type FakeStalwart } from "./stalwart.ts";
+import {
+  password,
+  startStalwart,
+  username,
+  type FakeStalwart,
+} from "./stalwart.ts";
 
-/** A fake Stalwart and a signed-in JMAP client for it. */
-export async function signedIn(options: { logger?: Logger } = {}) {
+/** A fake Stalwart and a JMAP client signed in to it with a password. */
+export function signedIn(options: { logger?: Logger } = {}) {
   const stalwart = startStalwart();
-  const dir = await mkdtemp(join(tmpdir(), "pim-"));
-  const config = {
-    origin: stalwart.origin,
-    clientId: "pim-mcp",
-    stateDir: dir,
-  };
-  stalwart.refreshTokens.add("refresh-synthetic");
-  const store = new TokenStore(dir);
-  await store.save({
-    version: 1,
-    origin: stalwart.origin,
-    client_id: "pim-mcp",
-    refresh_token: "refresh-synthetic",
-  });
-  const credentials = new Credentials(config, store, options);
+  stalwart.passwords.add(`${username}:${password}`);
+  const config = { origin: stalwart.origin, username };
+  const credentials = new Password(username, password, options);
   const jmap = new Jmap(config, credentials, options);
   return {
     stalwart,
     credentials,
     jmap,
     config,
-    async stop() {
-      await stalwart.stop();
-      await rm(dir, { recursive: true, force: true });
-    },
+    stop: () => stalwart.stop(),
   };
 }
-export type SignedIn = Awaited<ReturnType<typeof signedIn>> & {
+export type SignedIn = ReturnType<typeof signedIn> & {
   stalwart: FakeStalwart;
 };

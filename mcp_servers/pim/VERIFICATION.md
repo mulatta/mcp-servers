@@ -16,6 +16,15 @@ refused as occurrences, the 365-day expansion limit, `filter: null`, contact
 name search, Sieve validation of an uploaded blob, and identities for
 addresses without a public suffix.
 
+## 2026-11-13: VM test with Kanidm application passwords
+
+The same check passes with accounts in Kanidm 1.11 over LDAP, binding through a
+Kanidm application: the server signs in with an application password issued
+for it, all 39 tools pass, it stays signed in across a Stalwart restart, the
+next call after the person deletes that password is `AUTH_REQUIRED` while the
+account's other application password still works, and the Unix password no
+longer signs in to mail.
+
 ## Live server
 
 Not run yet. It needs the dedicated test accounts described in

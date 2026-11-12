@@ -15,6 +15,7 @@ export function readLogLevel(env: Env = process.env): LogLevel {
 
 export type ConfigCode =
   | "INVALID_SERVER"
+  | "INVALID_ACCOUNT"
   | "INVALID_TRANSPORT"
   | "INVALID_HTTP_CONFIG"
   | "INVALID_WRITES";
@@ -29,9 +30,10 @@ export class ConfigError extends Error {
 export interface ServerConfig {
   /** Origin of the Stalwart HTTP listener, without a trailing slash. */
   origin: string;
-  clientId: string;
-  /** Directory holding the rotating OAuth token. */
-  stateDir: string;
+  /** Login name of the account. */
+  username: string;
+  /** File holding the password issued for this server. */
+  passwordFile: string;
 }
 
 const loopback = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -43,8 +45,8 @@ export function readServer(env: Env = process.env): ServerConfig {
   } catch {
     throw new ConfigError("INVALID_SERVER");
   }
-  // Bearer tokens must not cross the network in clear text; plain HTTP is
-  // only for a listener on the same host, such as the VM test.
+  // Passwords must not cross the network in clear text; plain HTTP is only
+  // for a listener on the same host, such as the VM test.
   const secure =
     url.protocol === "https:" ||
     (url.protocol === "http:" && loopback.has(url.hostname));
@@ -57,20 +59,12 @@ export function readServer(env: Env = process.env): ServerConfig {
     url.pathname !== "/"
   )
     throw new ConfigError("INVALID_SERVER");
-  const clientId = env.PIM_CLIENT_ID || "pim-mcp";
-  if (!/^[A-Za-z0-9._-]{1,64}$/.test(clientId))
-    throw new ConfigError("INVALID_SERVER");
-  return { origin: url.origin, clientId, stateDir: stateDir(env) };
-}
-
-function stateDir(env: Env) {
-  if (env.PIM_STATE_DIR) return env.PIM_STATE_DIR;
-  // systemd lists every StateDirectory= entry, separated by colons.
-  const systemd = env.STATE_DIRECTORY?.split(":")[0];
-  if (systemd) return systemd;
-  if (env.XDG_STATE_HOME) return `${env.XDG_STATE_HOME}/pim-mcp`;
-  if (env.HOME) return `${env.HOME}/.local/state/pim-mcp`;
-  throw new ConfigError("INVALID_SERVER");
+  const username = env.PIM_USERNAME ?? "";
+  const passwordFile = env.PIM_PASSWORD_FILE ?? "";
+  // Basic authentication ends the login name at its first colon.
+  if (!/^[^:\p{Cc}]{1,256}$/u.test(username) || !passwordFile)
+    throw new ConfigError("INVALID_ACCOUNT");
+  return { origin: url.origin, username, passwordFile };
 }
 
 export type TransportConfig =
