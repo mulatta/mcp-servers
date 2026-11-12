@@ -25,7 +25,17 @@ next call after the person deletes that password is `AUTH_REQUIRED` while the
 account's other application password still works, and the Unix password no
 longer signs in to mail.
 
-## Live server
+## 2026-11-12: live read check
 
-Not run yet. It needs the dedicated test accounts described in
+With the owner's approval, the owner's account on the production server was
+signed in by OAuth device login, which this server used then, and every read
+tool was called with no write group
+enabled; only outcomes and counts were recorded. All 14 read tools answer.
+`pim_get_vacation` failed with `UPSTREAM_CHANGED` on this account, which had
+never set a vacation reply (see [UPSTREAM.md](UPSTREAM.md)); fixed and
+re-checked.
+
+## Live server writes
+
+Not run yet. They need the dedicated test accounts described in
 [DEVELOPMENT.md](DEVELOPMENT.md#live-checks) and the owner's approval.
