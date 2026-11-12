@@ -77,8 +77,8 @@ stdenvNoCC.mkDerivation {
       '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"check","version":"0"}}}' \
       '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
       '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-      | PIM_SERVER_URL=https://mail.example.test PIM_STATE_DIR=$TMPDIR/state \
-        $out/bin/pim-mcp > tools.json
+      | PIM_SERVER_URL=https://mail.example.test PIM_USERNAME=check \
+        PIM_PASSWORD_FILE=<(printf synthetic) $out/bin/pim-mcp > tools.json
     grep -q pim_search_emails tools.json
     runHook postInstallCheck
   '';

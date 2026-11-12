@@ -1,6 +1,6 @@
-// A stand-in for the Stalwart HTTP listener: the OAuth device and token
-// endpoints, the JMAP session and the JMAP API, with the response shapes of
-// Stalwart 0.15. Every value is synthetic.
+// A stand-in for the Stalwart HTTP listener: Basic authentication, the JMAP
+// session and the JMAP API, with the response shapes of Stalwart 0.15. Every
+// value is synthetic.
 
 export type MethodCall = [string, Record<string, unknown>, string];
 export type JmapHandler = (
@@ -10,32 +10,19 @@ export type JmapHandler = (
 
 export interface FakeStalwart {
   origin: string;
-  /** Refresh tokens the server accepts. */
-  refreshTokens: Set<string>;
-  /** Access tokens the server accepts. */
-  accessTokens: Set<string>;
-  /** Device codes and how many more polls stay pending before approval. */
-  devices: Map<string, { pending: number; clientId: string }>;
-  /** Hands out a new refresh token on the next refresh grant. */
-  rotateNext: boolean;
-  /** Answer for the next token request, instead of the normal flow. */
-  tokenOverride?: Response | undefined;
-  tokenRequests: URLSearchParams[];
-  jmapRequests: { calls: MethodCall[]; using: string[]; token: string }[];
+  /** Login name and password pairs the server accepts, as user:password. */
+  passwords: Set<string>;
+  /** Requests answered 401. */
+  refused: number;
+  jmapRequests: { calls: MethodCall[]; using: string[]; user: string }[];
   sessionRequests: number;
   jmap: JmapHandler;
   stop(): Promise<void>;
 }
 
 export const accountId = "a1";
-export const username = "tester@example.test";
-
-let serial = 0;
-const issue = (prefix: string) => `${prefix}-${++serial}-synthetic`;
-
-function oauthError(error: string) {
-  return Response.json({ error }, { status: 400 });
-}
+export const username = "tester";
+export const password = "app-password-synthetic";
 
 export function session(origin: string) {
   const capabilities = {
@@ -82,91 +69,38 @@ export function session(origin: string) {
 
 export function startStalwart(): FakeStalwart {
   const fake: Omit<FakeStalwart, "origin" | "stop"> = {
-    refreshTokens: new Set(),
-    accessTokens: new Set(),
-    devices: new Map(),
-    rotateNext: false,
-    tokenRequests: [],
+    passwords: new Set(),
+    refused: 0,
     jmapRequests: [],
     sessionRequests: 0,
     jmap: () => new Response(null, { status: 500 }),
   };
-  const grant = (withRefresh: boolean) => {
-    const access = issue("access");
-    fake.accessTokens.add(access);
-    const body: Record<string, unknown> = {
-      access_token: access,
-      token_type: "bearer",
-      expires_in: 3600,
-    };
-    if (withRefresh) {
-      const refresh = issue("refresh");
-      fake.refreshTokens.add(refresh);
-      body.refresh_token = refresh;
-    }
-    return Response.json(body);
-  };
-  const bearer = (request: Request) => {
-    const match = /^Bearer (.+)$/.exec(
+  /** The login name of accepted Basic credentials, or undefined. */
+  const user = (request: Request) => {
+    const match = /^Basic ([A-Za-z0-9+/=]+)$/.exec(
       request.headers.get("authorization") ?? "",
     );
-    return match && fake.accessTokens.has(match[1]!) ? match[1]! : undefined;
+    if (!match) return undefined;
+    const pair = Buffer.from(match[1]!, "base64").toString("utf8");
+    return fake.passwords.has(pair) ? pair.split(":")[0] : undefined;
+  };
+  const refuse = () => {
+    fake.refused++;
+    return new Response(null, { status: 401 });
   };
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     async fetch(request): Promise<Response> {
       const url = new URL(request.url);
-      if (url.pathname === "/auth/device" && request.method === "POST") {
-        const form = new URLSearchParams(await request.text());
-        const clientId = form.get("client_id");
-        if (!clientId) return new Response(null, { status: 400 });
-        const deviceCode = issue("device");
-        fake.devices.set(deviceCode, { pending: 1, clientId });
-        return Response.json({
-          verification_uri: `${origin}/authorize`,
-          verification_uri_complete: `${origin}/authorize/?code=ABCD-EFGH`,
-          device_code: deviceCode,
-          user_code: "ABCD-EFGH",
-          expires_in: 1800,
-          interval: 5,
-        });
-      }
-      if (url.pathname === "/auth/token" && request.method === "POST") {
-        const form = new URLSearchParams(await request.text());
-        fake.tokenRequests.push(form);
-        if (fake.tokenOverride) {
-          const answer = fake.tokenOverride;
-          fake.tokenOverride = undefined;
-          return answer;
-        }
-        const type = form.get("grant_type");
-        if (type === "urn:ietf:params:oauth:grant-type:device_code") {
-          const device = fake.devices.get(form.get("device_code") ?? "");
-          if (!device) return oauthError("expired_token");
-          if (device.clientId !== form.get("client_id"))
-            return oauthError("invalid_client");
-          if (device.pending-- > 0) return oauthError("authorization_pending");
-          fake.devices.delete(form.get("device_code")!);
-          return grant(true);
-        }
-        if (type === "refresh_token") {
-          if (!fake.refreshTokens.has(form.get("refresh_token") ?? ""))
-            return oauthError("invalid_grant");
-          const rotate = fake.rotateNext;
-          fake.rotateNext = false;
-          return grant(rotate);
-        }
-        return oauthError("invalid_grant");
-      }
       if (url.pathname === "/jmap/session" && request.method === "GET") {
         fake.sessionRequests++;
-        if (!bearer(request)) return new Response(null, { status: 401 });
+        if (!user(request)) return refuse();
         return Response.json(session(origin));
       }
       if (url.pathname === "/jmap/" && request.method === "POST") {
-        const token = bearer(request);
-        if (!token) return new Response(null, { status: 401 });
+        const name = user(request);
+        if (!name) return refuse();
         const body = (await request.json()) as {
           using: string[];
           methodCalls: MethodCall[];
@@ -174,7 +108,7 @@ export function startStalwart(): FakeStalwart {
         fake.jmapRequests.push({
           calls: body.methodCalls,
           using: body.using,
-          token,
+          user: name,
         });
         const answer = await fake.jmap(body.methodCalls, body.using);
         if (answer instanceof Response) return answer;

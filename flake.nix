@@ -104,12 +104,15 @@
             pimTest = {
               tokenFile = "/etc/pim-mcp-token";
               token = "flakelet-vm-test-token-pim-0123456789abcdef";
+              username = "tester";
+              # Written by the test once Kanidm has issued the password.
+              passwordFile = "/run/pim-mcp-password";
             };
             pimArtifact = flakelet.lib.buildArtifact pkgsFor.${system} {
               name = "pim-mcp";
               module = self.flakelets.pim;
               settings = {
-                inherit (pimTest) tokenFile;
+                inherit (pimTest) tokenFile username passwordFile;
                 serverUrl = "http://127.0.0.1:8080";
                 writes = [ "all" ];
               };

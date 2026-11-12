@@ -36,6 +36,7 @@ const eventSchema = z.union([
     code: z.enum([
       "INVALID_LOG_LEVEL",
       "INVALID_SERVER",
+      "INVALID_ACCOUNT",
       "INVALID_TRANSPORT",
       "INVALID_HTTP_CONFIG",
       "INVALID_WRITES",
@@ -51,19 +52,7 @@ const eventSchema = z.union([
     ]),
   }),
   z.object({ event: z.literal("logs.dropped"), count: count.positive() }),
-  z.object({
-    event: z.literal("auth.refresh"),
-    trigger: z.enum(["request", "background", "unauthorized"]),
-    outcome: z.enum(["ok", "error"]),
-    rotated: z.boolean().optional(),
-    code: code.optional(),
-    http_status: z.number().int().min(100).max(599).optional(),
-    duration_ms: duration,
-  }),
-  z.object({
-    event: z.literal("state.write_failed"),
-    code: z.literal("STATE_WRITE_FAILED"),
-  }),
+  z.object({ event: z.literal("auth.rejected") }),
   z.object({
     event: z.literal("upstream.write"),
     methods: z.array(methodName).max(16),
@@ -105,12 +94,11 @@ function severity(data: {
   switch (data.event) {
     case "server.fatal":
     case "config.invalid":
-    case "state.write_failed":
+    case "auth.rejected":
       return "error";
     case "logs.dropped":
     case "http.rejected":
       return "warn";
-    case "auth.refresh":
     case "request.end":
       return data.outcome === "ok" ? "info" : "warn";
     case "upstream.write":

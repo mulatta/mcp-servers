@@ -1,6 +1,6 @@
 const messages = {
   AUTH_REQUIRED:
-    "Not signed in to the mail server, or the sign-in expired or was revoked. The operator must run `pim-mcp login` again.",
+    "The mail server refused this server's password; it may have been revoked. The operator must issue a new one and restart the server.",
   NOT_FOUND:
     "The requested item does not exist or is not visible to this account.",
   INVALID_REQUEST: "The mail server rejected the request as invalid.",
