@@ -312,6 +312,20 @@ describe("account settings", () => {
     });
   });
 
+  test("pim_get_vacation on an account that never set one", async () => {
+    // Stalwart answers notFound until the first VacationResponse/set.
+    env.stalwart.jmap = answer({
+      "VacationResponse/get": { list: [], notFound: ["singleton"] },
+    });
+    expect((await env.call("pim_get_vacation")).structured).toEqual({
+      enabled: false,
+      from_date: null,
+      to_date: null,
+      subject: null,
+      text_body: null,
+    });
+  });
+
   test("pim_list_sieve_scripts and pim_get_sieve_script", async () => {
     env.stalwart.jmap = answer({
       "SieveScript/get": {

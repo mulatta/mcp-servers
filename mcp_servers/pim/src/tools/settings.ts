@@ -34,9 +34,20 @@ export const getVacation = tool({
       [["VacationResponse/get", { ids: ["singleton"] }]],
       signal,
     );
-    const found = entry(expect(getList, result).list, "singleton");
-    if (!found) throw new SafeError("UPSTREAM_CHANGED");
-    return vacationResult(found);
+    const answer = expect(getList, result);
+    const found = entry(answer.list, "singleton");
+    if (found) return vacationResult(found);
+    // Stalwart has no singleton until the first VacationResponse/set; an
+    // account that never set one has the reply off.
+    if (answer.notFound?.includes("singleton"))
+      return {
+        enabled: false,
+        from_date: null,
+        to_date: null,
+        subject: null,
+        text_body: null,
+      };
+    throw new SafeError("UPSTREAM_CHANGED");
   },
 });
 
