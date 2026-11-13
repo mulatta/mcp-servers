@@ -5,9 +5,9 @@ import { request } from "node:http";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { TokenStore } from "../../src/auth/tokens.ts";
 import { validDiagnostic } from "../../src/observability/logger.ts";
 import {
+  password,
   startStalwart,
   username,
   type FakeStalwart,
@@ -19,13 +19,8 @@ let stalwart: FakeStalwart;
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "pim-process-"));
   stalwart = startStalwart();
-  stalwart.refreshTokens.add("refresh-synthetic");
-  await new TokenStore(dir).save({
-    version: 1,
-    origin: stalwart.origin,
-    client_id: "pim-mcp",
-    refresh_token: "refresh-synthetic",
-  });
+  stalwart.passwords.add(`${username}:${password}`);
+  await writeFile(join(dir, "password"), `${password}\n`);
   stalwart.jmap = (calls) =>
     calls.map(([name, , id]) => [
       name,
@@ -51,9 +46,9 @@ afterEach(async () => {
 
 const env = (extra: Record<string, string> = {}) => ({
   PATH: process.env.PATH ?? "",
-  HOME: dir,
   PIM_SERVER_URL: stalwart.origin,
-  PIM_STATE_DIR: dir,
+  PIM_USERNAME: username,
+  PIM_PASSWORD_FILE: join(dir, "password"),
   PIM_LOG_LEVEL: "debug",
   ...extra,
 });
@@ -63,12 +58,12 @@ function checkDiagnostics(stderr: string) {
   expect(lines.length).toBeGreaterThan(0);
   for (const line of lines)
     expect(validDiagnostic(JSON.parse(line))).toBe(true);
-  for (const secret of ["refresh-synthetic", "access-", username, "Inbox"])
+  for (const secret of [password, "Inbox"])
     expect(stderr).not.toContain(secret);
   return lines.map((line) => JSON.parse(line));
 }
 
-test("stdio serves tools, refreshes in the background and logs only safe fields", async () => {
+test("stdio serves tools and logs only safe fields", async () => {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [entry],
@@ -94,30 +89,19 @@ test("stdio serves tools, refreshes in the background and logs only safe fields"
   );
   expect(records).toContainEqual(
     expect.objectContaining({
-      event: "auth.refresh",
-      trigger: "background",
-      outcome: "ok",
-    }),
-  );
-  expect(records).toContainEqual(
-    expect.objectContaining({
       event: "request.end",
       tool: "pim_list_mailboxes",
       outcome: "ok",
       returned_count: 1,
     }),
   );
-  // One shared refresh served both the background timer and the first call.
-  const refreshes = stalwart.tokenRequests.filter(
-    (form) => form.get("grant_type") === "refresh_token",
-  );
-  expect(refreshes.length).toBeLessThanOrEqual(2);
 });
 
 test("invalid configuration exits before serving", async () => {
   for (const [extra, code] of [
     [{ PIM_SERVER_URL: "http://mail.example.test" }, "INVALID_SERVER"],
     [{ PIM_WRITES: "everything" }, "INVALID_WRITES"],
+    [{ PIM_PASSWORD_FILE: join(dir, "missing") }, "INVALID_ACCOUNT"],
     [
       {
         PIM_TRANSPORT: "http",

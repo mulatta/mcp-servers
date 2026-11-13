@@ -6,14 +6,12 @@
   "packageManager": "bun@1.4.2",
   "scripts": {
     "start": "bun run src/index.ts",
-    "login": "bun run src/index.ts login",
     "test": "bun test tests/protocol",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "bun run typecheck && bun run format:check",
-    "live:login": "bun --env-file=.env.test tests/live/run.ts login",
-    "live:test": "bun --env-file=.env.test tests/live/run.ts test"
+    "live:test": "bun --env-file=.env.test tests/live/run.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

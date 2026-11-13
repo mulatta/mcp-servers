@@ -3,44 +3,43 @@
 Behaviour of Stalwart that this server depends on. Source statements were
 checked against Stalwart 0.15.5 (`stalwart_0_15` in the pinned nixpkgs);
 behaviour statements come from the NixOS VM test, which runs that version with
-PostgreSQL storage, the internal directory and registered OAuth clients only.
+PostgreSQL storage and a Kanidm 1.11 LDAP directory that binds through a Kanidm
+application, as planned for the production host.
 
 ## Authentication
 
 - HTTP accepts `Basic` (password or app password), `Bearer` OAuth tokens, and
   `Bearer api_…` API keys for the management API only
-  (`crates/http/src/auth/authenticate.rs`). With an LDAP directory, Basic
-  authenticates against the directory's own password, so this server uses
-  OAuth instead.
-- Device authorization: `POST /auth/device` with `client_id`; Stalwart answers
-  `device_code`, `user_code`, `verification_uri` (`<origin>/authorize`),
-  `verification_uri_complete`, `expires_in` (`oauth.expiry.user-code`, 30
-  minutes) and `interval` 5. Polling `POST /auth/token` with grant
-  `urn:ietf:params:oauth:grant-type:device_code` answers 400
-  `authorization_pending` until approved, then an access and a refresh token.
-- The web admin approves a code with `POST /api/oauth`
-  `{"type":"device","code":"<user code>"}` as the signed-in account; the VM
-  test uses this to stand in for the operator's browser.
-- `oauth.client-registration.require = true` makes Stalwart check, when it
-  issues the token, that the client ID is a registered `oauthClient`
-  principal.
-- Expiry (`crates/common/src/auth/oauth/config.rs`): access tokens 1 hour,
-  refresh tokens 30 days. A `refresh_token` grant returns a new refresh token
-  only when the old one has at most `oauth.expiry.refresh-token-renew` (4 days)
-  left (`crates/http/src/auth/oauth/token.rs`); otherwise the answer has no
-  `refresh_token` and the old one stays in use.
-- Tokens are signed, not stored: validation checks the signature, expiry and,
-  for tokens longer than an hour, a hash of the account secret. A rotated
-  refresh token therefore stays valid until it expires, and a password change
-  revokes refresh tokens only if the directory's secret changes with it.
-- Stalwart does not enforce OAuth scopes: the issued token carries no scope
-  and authorizes everything the account may do.
-- Refresh tokens contain `+` and `/`; form bodies must be URL-encoded.
+  (`crates/http/src/auth/authenticate.rs`). This server uses Basic.
+- With an LDAP directory and `bind.auth.method = "template"`, Stalwart checks a
+  password only by binding to the directory as the person with it
+  (`crates/directory/src/backend/ldap/lookup.rs`). It never consults the
+  application passwords it stores itself: the VM test created one through
+  `/api/account/auth`, saw it listed, and was refused when signing in with it.
+  In that test, the refused bind also locked the person's Unix password for a
+  while, which is Kanidm's lockout after a failed bind.
+- Kanidm application passwords (Kanidm 1.11) authenticate binds whose DN names
+  the application (`spn=<person>,app=<application>,<base DN>`); such a bind
+  accepts only that application's passwords. Only the person may issue or
+  delete them (`idm_acp_self_write`), and the person needs a privileged
+  session for it. Stalwart has one bind template, so every password sign-in to
+  mail goes through the application.
+- Stalwart caches neither Basic sign-ins nor bind results across requests: the
+  VM test deletes the server's application password and the next request is
+  refused, while the account's other application passwords keep working.
+- Failed sign-ins count toward `server.auto-ban.auth.rate` (default `100/1d`)
+  per address (`crates/common/src/listener/blocked.rs`), so the server stops
+  sending a refused password.
+- OAuth (not used): tokens are signed, not stored, and nothing lists or revokes
+  them one by one; refresh grants do not check the client's registration.
+  Without a fixed `oauth.key`, and with `oauth.*` in `config.local-keys` as on
+  the production host, Stalwart generates a new signing key at every start
+  and every token stops working.
 
 ## Session
 
 - `GET /jmap/session` reports `apiUrl` from `http.url`. The server sends its
-  token only to an `apiUrl` on the configured origin and refuses anything else
+  password only to an `apiUrl` on the configured origin and refuses anything else
   with `UPSTREAM_CHANGED`, so `http.url` must match `PIM_SERVER_URL`.
 - The session lists `maxExpandedQueryDuration` `P52W1D` for calendars, which
   bounds `pim_search_events` to 365 days.
