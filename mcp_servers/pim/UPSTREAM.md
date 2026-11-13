@@ -46,7 +46,7 @@ application, as planned for the production host.
 
 ## Where Stalwart 0.15 departs from the specifications
 
-Each was found by the VM test and is covered by a protocol test.
+Each was found by the VM test or the live read check and is covered by a protocol test.
 
 | Behaviour | Effect on this server |
 | --- | --- |
@@ -60,6 +60,7 @@ Each was found by the VM test and is covered by a protocol test.
 | A delivered message whose Message-ID the account already holds is skipped as a duplicate | Mail sent to the account itself never reaches its Inbox; tests send to a second account |
 | Text search reads the search index, written shortly after an object | Tests poll; descriptions warn that new items appear in text searches after a moment |
 | Missing calendar properties are omitted rather than null | Event schemas treat them as optional |
+| `VacationResponse/get` reports the singleton in `notFound` until the account first sets one; `VacationResponse/set` updates it anyway, creating it | An absent singleton reads as the reply being off |
 
 ## Calendars and scheduling
 
