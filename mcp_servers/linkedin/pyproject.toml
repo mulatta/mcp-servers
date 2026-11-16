@@ -10,6 +10,9 @@ dependencies = [
   "fastmcp>=4.0.10,<5",
 ]
 
+[project.scripts]
+linkedin-mcp = "linkedin_mcp.__main__:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
